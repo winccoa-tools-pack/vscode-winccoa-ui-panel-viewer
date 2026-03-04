@@ -1,9 +1,9 @@
 {
-  "name": "winccoa-hello-world",
-  "displayName": "WinCC OA — Hello World",
-  "description": "VS Code extension template for WinCC OA tools.",
+  "name": "winccoa-ui-panel-viewer",
+  "displayName": "WinCC OA UI Panel Viewer",
+  "description": "Read-only viewer for WinCC OA .pnl panel files with structure tree, properties, scripts, and preview launcher.",
   "publisher": "winccoa-tools-pack",
-  "version": "0.1.5",
+  "version": "0.1.0",
   "author": "winccoa-tools-pack",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -32,7 +32,9 @@
     "automation"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onLanguage:xml",
+    "workspaceContains:**/*.pnl"
   ],
   "main": "./dist/extension.js",
   "private": false,
@@ -41,8 +43,125 @@
       {
         "command": "winccoa.helloWorld",
         "title": "WinCC OA: Hello World"
+      },
+      {
+        "command": "winccoaPanelViewer.openPanel",
+        "title": "WinCC OA: Open Panel in Viewer"
+      },
+      {
+        "command": "winccoaPanelViewer.loadAllPanels",
+        "title": "WinCC OA: Load All Panels from Project"
+      },
+      {
+        "command": "winccoaPanelViewer.clearPanels",
+        "title": "WinCC OA: Clear Panel Viewer"
+      },
+      {
+        "command": "winccoaPanelViewer.pnlToXml",
+        "title": "WinCC OA: Convert PNL to XML"
+      },
+      {
+        "command": "winccoaPanelViewer.xmlToPnl",
+        "title": "WinCC OA: Convert XML to PNL"
+      },
+      {
+        "command": "winccoaPanelViewer.convertDirPnlToXml",
+        "title": "WinCC OA: Convert Directory PNL → XML"
+      },
+      {
+        "command": "winccoaPanelViewer.convertDirXmlToPnl",
+        "title": "WinCC OA: Convert Directory XML → PNL"
+      },
+      {
+        "command": "winccoaPanelViewer.previewPanel",
+        "title": "WinCC OA: Preview Panel in UI"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "winccoaPanelViewer",
+          "title": "WinCC OA Panel Viewer",
+          "icon": "resources/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "winccoaPanelViewer": [
+        {
+          "id": "winccoaPanelStructure",
+          "name": "Panel Structure"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "winccoaPanelStructure",
+        "contents": "No panel loaded.\n[Open Panel](command:winccoaPanelViewer.openPanel)\n[Load All Panels from Project](command:winccoaPanelViewer.loadAllPanels)\nOr right-click a .pnl file in Explorer → 'WinCC OA: Open Panel'"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "winccoaPanelViewer.openPanel",
+          "when": "resourceExtname == .pnl",
+          "group": "winccoa@1"
+        },
+        {
+          "command": "winccoaPanelViewer.pnlToXml",
+          "when": "resourceExtname == .pnl",
+          "group": "winccoa@2"
+        },
+        {
+          "command": "winccoaPanelViewer.xmlToPnl",
+          "when": "resourceExtname == .xml",
+          "group": "winccoa@2"
+        },
+        {
+          "command": "winccoaPanelViewer.convertDirPnlToXml",
+          "when": "explorerResourceIsFolder",
+          "group": "winccoa@3"
+        },
+        {
+          "command": "winccoaPanelViewer.convertDirXmlToPnl",
+          "when": "explorerResourceIsFolder",
+          "group": "winccoa@3"
+        },
+        {
+          "command": "winccoaPanelViewer.previewPanel",
+          "when": "resourceExtname == .pnl",
+          "group": "winccoa@4"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "winccoaPanelViewer.previewPanel",
+          "when": "view == winccoaPanelStructure",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "WinCC OA Panel Viewer",
+      "properties": {
+        "winccoaPanelViewer.winccoaVersion": {
+          "type": "string",
+          "default": "3.20",
+          "description": "WinCC OA version to use for panel conversion (e.g., 3.20, 3.21). TODO: Will be auto-detected from winccoa-project-admin extension."
+        },
+        "winccoaPanelViewer.winccoaBinPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to WinCC OA bin directory for preview launcher (e.g., C:\\Siemens\\Automation\\WinCC_OA\\3.20\\bin). Falls back to WINCCOA_PATH if not set."
+        },
+        "winccoaPanelViewer.logLevel": {
+          "type": "string",
+          "enum": ["ERROR", "WARN", "INFO", "DEBUG", "TRACE"],
+          "default": "INFO",
+          "description": "Log level for extension output."
+        }
+      }
+    }
   },
   "extensionDependencies": [
     "RichardJanisch.winccoa-project-admin"
@@ -122,6 +241,7 @@
     "winccoaImage": "mpokornyetm/winccoa-tools-pack-npm-winccoa-core:npm-winccoa-core"
   },
   "dependencies": {
-    "@winccoa-tools-pack/npm-winccoa-core": "0.2.6"
+    "@winccoa-tools-pack/npm-winccoa-core": "0.2.6",
+    "@winccoa-tools-pack/npm-winccoa-ui-pnl-xml": "^0.1.0"
   }
 }

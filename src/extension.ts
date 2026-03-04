@@ -43,6 +43,7 @@ import * as vscode from 'vscode';
 import { ExtensionOutputChannel } from './extensionOutput';
 import { EXTENSION_CONFIG_SECTION, EXTENSION_ID, EXTENSION_NAME } from './const';
 import { setupCoreExtensionIntegration, cleanupCoreExtensionIntegration } from './otherExtensions';
+import { registerCommands } from './commands';
 
 /**
  * Interface representing a WinCC OA project.
@@ -103,6 +104,9 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(disposable);
+
+    // Register feature commands (conversion, viewer, preview)
+    registerCommands(context);
 }
 
 /**
