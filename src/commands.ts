@@ -120,33 +120,23 @@ async function openPanelCommand(uri?: vscode.Uri): Promise<void> {
 async function loadAllPanelsCommand(): Promise<void> {
     if (!treeProvider) return;
 
-    // Find panels directory in workspace
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showWarningMessage('No workspace folder open.');
+    const currentProject = getSelectedProject();
+    if (!currentProject) {
+        vscode.window.showWarningMessage(
+            'No WinCC OA project selected. Select a project in WinCC OA Project Admin first.',
+        );
         return;
     }
 
-    // Look for panels directory
-    let panelsDir: string | undefined;
-    for (const folder of workspaceFolders) {
-        const possiblePath = path.join(folder.uri.fsPath, 'panels');
-        if (fs.existsSync(possiblePath) && fs.statSync(possiblePath).isDirectory()) {
-            panelsDir = possiblePath;
-            break;
-        }
-    }
+    const panelsDir = currentProject
+        .getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH)
+        .replace(/\\/g, path.sep);
 
-    if (!panelsDir) {
-        // Ask user to select directory
-        const uris = await vscode.window.showOpenDialog({
-            canSelectFiles: false,
-            canSelectFolders: true,
-            canSelectMany: false,
-            title: 'Select Panels Directory',
-        });
-        if (!uris || uris.length === 0) return;
-        panelsDir = uris[0].fsPath;
+    if (!fs.existsSync(panelsDir) || !fs.statSync(panelsDir).isDirectory()) {
+        vscode.window.showErrorMessage(
+            `Panels directory not found for project ${currentProject.getId()}: ${panelsDir}`,
+        );
+        return;
     }
 
     // Clear existing panels
