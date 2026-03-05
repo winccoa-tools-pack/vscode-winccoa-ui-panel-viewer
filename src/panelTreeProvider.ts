@@ -15,6 +15,7 @@ import { PanelModel, PanelShape, PanelProperty, PanelScript, PanelReference } fr
 type TreeItemType = 'panel' | 'shape' | 'property' | 'script' | 'reference' | 'folder';
 
 type ChildType =
+    | 'dir'
     | 'shapes'
     | 'properties'
     | 'scripts'
@@ -30,6 +31,7 @@ type ChildType =
 export class PanelTreeItem extends vscode.TreeItem {
     public modelPath?: string;
     public childType?: ChildType;
+    public directoryChildren?: PanelTreeItem[];
     public shapeData?: PanelShape;
     public propData?: PanelProperty;
 
@@ -170,25 +172,90 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
     }
 
     private buildTree(): PanelTreeItem[] {
-        const items: PanelTreeItem[] = [];
+        type DirNode = {
+            folders: Map<string, DirNode>;
+            models: PanelModel[];
+        };
+
+        const root: DirNode = { folders: new Map(), models: [] };
+
+        const getRelativePath = (absolutePath: string): string => {
+            const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(absolutePath));
+            if (!folder) {
+                return absolutePath;
+            }
+            return path.relative(folder.uri.fsPath, absolutePath);
+        };
 
         for (const model of this.models.values()) {
-            const panelItem = new PanelTreeItem(
-                model.name,
-                'panel',
-                vscode.TreeItemCollapsibleState.Expanded,
-            );
-            panelItem.description = model.encrypted
-                ? '🔒 Encrypted'
-                : path.basename(model.filePath);
-            panelItem.modelPath = model.filePath;
-            items.push(panelItem);
+            const rel = getRelativePath(model.filePath);
+            const normalized = rel.replace(/\\/g, '/');
+            const segments = normalized.split('/').filter(Boolean);
+
+            // Defensive: if we cannot compute segments, just add to root
+            if (segments.length <= 1) {
+                root.models.push(model);
+                continue;
+            }
+
+            // All segments except the filename are directories
+            let current = root;
+            for (const dirName of segments.slice(0, -1)) {
+                let next = current.folders.get(dirName);
+                if (!next) {
+                    next = { folders: new Map(), models: [] };
+                    current.folders.set(dirName, next);
+                }
+                current = next;
+            }
+            current.models.push(model);
         }
 
-        return items;
+        const buildDirItems = (node: DirNode, parent?: PanelTreeItem): PanelTreeItem[] => {
+            const folders: PanelTreeItem[] = [];
+            const panels: PanelTreeItem[] = [];
+
+            for (const [dirName, childNode] of node.folders) {
+                const folderItem = new PanelTreeItem(
+                    dirName,
+                    'folder',
+                    vscode.TreeItemCollapsibleState.Collapsed,
+                    undefined,
+                    parent,
+                );
+                folderItem.childType = 'dir';
+                folderItem.directoryChildren = buildDirItems(childNode, folderItem);
+                folders.push(folderItem);
+            }
+
+            for (const model of node.models) {
+                const fileName = path.basename(model.filePath);
+                const panelItem = new PanelTreeItem(
+                    fileName,
+                    'panel',
+                    vscode.TreeItemCollapsibleState.Expanded,
+                    undefined,
+                    parent,
+                );
+                panelItem.modelPath = model.filePath;
+                panelItem.description = model.encrypted ? '🔒 Encrypted' : undefined;
+                panels.push(panelItem);
+            }
+
+            folders.sort((a, b) => a.label.localeCompare(b.label));
+            panels.sort((a, b) => a.label.localeCompare(b.label));
+            return [...folders, ...panels];
+        };
+
+        return buildDirItems(root);
     }
 
     private getChildItems(parent: PanelTreeItem): PanelTreeItem[] {
+        // Directory nodes: children are precomputed in buildTree()
+        if (parent.itemType === 'folder' && parent.childType === 'dir') {
+            return parent.directoryChildren ?? [];
+        }
+
         // Find model for this panel item
         const modelPath = parent.modelPath || this.findModelPath(parent);
         const model = modelPath ? this.models.get(modelPath) : undefined;
