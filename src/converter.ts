@@ -16,14 +16,15 @@ import { pnlToXml, xmlToPnl } from '@winccoa-tools-pack/npm-winccoa-ui-pnl-xml';
 import { ExtensionOutputChannel } from './extensionOutput';
 import { getSelectedProject } from './otherExtensions';
 
-
 // TODO: Get config path from winccoa-project-admin extension when available
 // Hardcoded for playground/testing
-const TEMP_CONFIG_PATH = 'C:\\ws\\ETM\\WinCCOA\\support\\3.20\\Test\\CtrlTF\\WinCC_OA_Test\\Projects\\TfCustomized\\config\\config';
+const TEMP_CONFIG_PATH =
+    'C:\\ws\\ETM\\WinCCOA\\support\\3.20\\Test\\CtrlTF\\WinCC_OA_Test\\Projects\\TfCustomized\\config\\config';
 
 // TODO: Get panels directory from winccoa-project-admin extension when available
 // Hardcoded for playground/testing - panel paths must be relative to this directory
-const TEMP_PANELS_DIR = 'C:\\ws\\ETM\\WinCCOA\\support\\3.20\\Test\\CtrlTF\\WinCC_OA_Test\\Projects\\TfCustomized\\panels';
+const TEMP_PANELS_DIR =
+    'C:\\ws\\ETM\\WinCCOA\\support\\3.20\\Test\\CtrlTF\\WinCC_OA_Test\\Projects\\TfCustomized\\panels';
 
 /** Result of a conversion operation */
 export interface ConversionResult {
@@ -54,10 +55,10 @@ export async function isEncryptedPanel(filePath: string): Promise<boolean> {
  */
 function getWinccoaVersion(): string | undefined {
     const currentProject = getSelectedProject();
-    
-            if (!currentProject) {
-                return undefined;
-            }
+
+    if (!currentProject) {
+        return undefined;
+    }
 
     if (!currentProject.getVersion()) {
         vscode.window.showWarningMessage(
@@ -65,7 +66,7 @@ function getWinccoaVersion(): string | undefined {
         );
     }
 
-    return currentProject.getVersion();  
+    return currentProject.getVersion();
 }
 
 /**
@@ -86,48 +87,59 @@ export async function convertPnlToXml(
         return { success: false, error: 'Encrypted panel; content not viewable.' };
     }
 
+    const version = getWinccoaVersion();
+    if (!version) {
+        return {
+            success: false,
+            error: 'No WinCC OA project selected; cannot determine WinCC OA version for conversion.',
+        };
+    }
+
     const baseName = path.basename(pnlPath);
-    
+
     // WCCOAui requires panel paths relative to project panels directory
     // Create a temp subfolder inside panels dir, copy file there, convert
     const tempSubDir = `_temp_convert_${Date.now()}`;
     const tempPanelsPath = path.join(TEMP_PANELS_DIR, tempSubDir);
-    
+
     // Ensure temp directory exists
     await fs.promises.mkdir(tempPanelsPath, { recursive: true });
-    
+
     // Copy file to temp panels subdirectory
     const workingFilePath = path.join(tempPanelsPath, baseName);
     await fs.promises.copyFile(pnlPath, workingFilePath);
-    
+
     // Relative path from panels directory (what WCCOAui expects)
     const relativePath = `${tempSubDir}/${baseName}`;
 
     try {
-        const version = getWinccoaVersion();
-        ExtensionOutputChannel.debug('Converter', `Converting PNL to XML: ${relativePath} (version: ${version})`);
-        
+        ExtensionOutputChannel.debug(
+            'Converter',
+            `Converting PNL to XML: ${relativePath} (version: ${version})`,
+        );
+
         const result = await pnlToXml({
             version,
             inputPath: relativePath,
             configPath: TEMP_CONFIG_PATH, // TODO: Get from winccoa-project-admin
             overwrite: true,
         });
-        
+
         if (result.success) {
             // After in-place conversion, the file now contains XML
             // Copy to user's temp dir before cleanup
-            const userTempDir = outputDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'winccoa-panel-'));
+            const userTempDir =
+                outputDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'winccoa-panel-'));
             const outputFilePath = path.join(userTempDir, baseName);
             await fs.promises.copyFile(workingFilePath, outputFilePath);
-            
+
             // Cleanup project panels temp dir
             try {
                 await fs.promises.rm(tempPanelsPath, { recursive: true, force: true });
             } catch {
                 // Ignore cleanup errors
             }
-            
+
             return { success: true, outputPath: outputFilePath };
         } else {
             const errorMsg = result.stderr || `Conversion failed with exit code ${result.exitCode}`;
@@ -166,48 +178,58 @@ export async function convertXmlToPnl(
     xmlPath: string,
     outputDir?: string,
 ): Promise<ConversionResult> {
+    const version = getWinccoaVersion();
+    if (!version) {
+        return {
+            success: false,
+            error: 'No WinCC OA project selected; cannot determine WinCC OA version for conversion.',
+        };
+    }
+
     const baseName = path.basename(xmlPath);
-    
+
     // WCCOAui requires panel paths relative to project panels directory
     // Create a temp subfolder inside panels dir, copy file there, convert
     const tempSubDir = `_temp_convert_${Date.now()}`;
     const tempPanelsPath = path.join(TEMP_PANELS_DIR, tempSubDir);
-    
+
     // Ensure temp directory exists
     await fs.promises.mkdir(tempPanelsPath, { recursive: true });
-    
+
     // Copy file to temp panels subdirectory
     const workingFilePath = path.join(tempPanelsPath, baseName);
     await fs.promises.copyFile(xmlPath, workingFilePath);
-    
+
     // Relative path from panels directory (what WCCOAui expects)
     const relativePath = `${tempSubDir}/${baseName}`;
 
     try {
-        const version = getWinccoaVersion();
-        ExtensionOutputChannel.debug('Converter', `Converting XML to PNL: ${relativePath} (version: ${version})`);
-        
+        ExtensionOutputChannel.debug(
+            'Converter',
+            `Converting XML to PNL: ${relativePath} (version: ${version})`,
+        );
+
         const result = await xmlToPnl({
             version,
             inputPath: relativePath,
             configPath: TEMP_CONFIG_PATH, // TODO: Get from winccoa-project-admin
             overwrite: true,
         });
-        
+
         if (result.success) {
             // After in-place conversion, the file now contains PNL
             // Copy to target directory
             const targetDir = outputDir ?? path.dirname(xmlPath);
             const outputFilePath = path.join(targetDir, baseName);
             await fs.promises.copyFile(workingFilePath, outputFilePath);
-            
+
             // Cleanup project panels temp dir
             try {
                 await fs.promises.rm(tempPanelsPath, { recursive: true, force: true });
             } catch {
                 // Ignore cleanup errors
             }
-            
+
             return { success: true, outputPath: outputFilePath };
         } else {
             const errorMsg = result.stderr || `Conversion failed with exit code ${result.exitCode}`;

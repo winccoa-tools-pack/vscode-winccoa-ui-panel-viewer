@@ -20,15 +20,18 @@ import { parsePanelXml } from './panelParser';
 import { createEncryptedPanelModel } from './panelModel';
 import { PanelScript } from './panelModel';
 import { UIComponent } from '@winccoa-tools-pack/npm-winccoa-core/types/components/implementations/index';
-import { ProjectInfo, extraUiViewerOptions, getSelectedProject } from './otherExtensions';
+import { getSelectedProject } from './otherExtensions';
 import { CORE_EXTENSION_ID } from './const';
-import { ProjEnvProject, ProjEnvProjectFileSysStruct } from '@winccoa-tools-pack/npm-winccoa-core';
+import { ProjEnvProjectFileSysStruct } from '@winccoa-tools-pack/npm-winccoa-core';
 
 /** Singleton tree provider instance */
 let treeProvider: PanelTreeProvider | undefined;
 
 /** File watcher for .pnl changes */
 let fileWatcher: vscode.FileSystemWatcher | undefined;
+
+/** Debounce timers for panel reloads (keyed by absolute fsPath) */
+const pendingPanelReloads = new Map<string, NodeJS.Timeout>();
 
 /** Currently viewed panel path */
 let currentPanelPath: string | undefined;
@@ -49,25 +52,34 @@ export function registerCommands(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
         // Open panel in viewer
         vscode.commands.registerCommand('winccoaPanelViewer.openPanel', openPanelCommand),
-        
+
         // Load all panels from project
         vscode.commands.registerCommand('winccoaPanelViewer.loadAllPanels', loadAllPanelsCommand),
-        
+
         // Clear panel viewer
         vscode.commands.registerCommand('winccoaPanelViewer.clearPanels', clearPanelsCommand),
-        
+
         // Convert single file
         vscode.commands.registerCommand('winccoaPanelViewer.pnlToXml', pnlToXmlCommand),
         vscode.commands.registerCommand('winccoaPanelViewer.xmlToPnl', xmlToPnlCommand),
-        
+
         // Convert directory
-        vscode.commands.registerCommand('winccoaPanelViewer.convertDirPnlToXml', convertDirPnlToXmlCommand),
-        vscode.commands.registerCommand('winccoaPanelViewer.convertDirXmlToPnl', convertDirXmlToPnlCommand),
-        
+        vscode.commands.registerCommand(
+            'winccoaPanelViewer.convertDirPnlToXml',
+            convertDirPnlToXmlCommand,
+        ),
+        vscode.commands.registerCommand(
+            'winccoaPanelViewer.convertDirXmlToPnl',
+            convertDirXmlToPnlCommand,
+        ),
+
         // Preview launcher
         vscode.commands.registerCommand('winccoaPanelViewer.previewPanel', previewPanelCommand),
-        vscode.commands.registerCommand('winccoaPanelViewer.previewPanelWithOptions', previewPanelWithOptionsCommand),
-        
+        vscode.commands.registerCommand(
+            'winccoaPanelViewer.previewPanelWithOptions',
+            previewPanelWithOptionsCommand,
+        ),
+
         // Show script in editor
         vscode.commands.registerCommand('winccoaPanelViewer.showScript', showScriptCommand),
     );
@@ -142,39 +154,42 @@ async function loadAllPanelsCommand(): Promise<void> {
 
     // Find all .pnl files recursively
     const pnlFiles = await findPnlFilesRecursive(panelsDir);
-    
+
     if (pnlFiles.length === 0) {
         vscode.window.showInformationMessage('No .pnl files found in directory.');
         return;
     }
 
     // Load panels with progress
-    await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: 'Loading panels',
-        cancellable: true,
-    }, async (progress, token) => {
-        let loaded = 0;
-        const total = pnlFiles.length;
+    await vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: 'Loading panels',
+            cancellable: true,
+        },
+        async (progress, token) => {
+            let loaded = 0;
+            const total = pnlFiles.length;
 
-        for (const pnlPath of pnlFiles) {
-            if (token.isCancellationRequested) break;
+            for (const pnlPath of pnlFiles) {
+                if (token.isCancellationRequested) break;
 
-            progress.report({
-                message: `${loaded}/${total} - ${path.basename(pnlPath)}`,
-                increment: (1 / total) * 100,
-            });
+                progress.report({
+                    message: `${loaded}/${total} - ${path.basename(pnlPath)}`,
+                    increment: (1 / total) * 100,
+                });
 
-            try {
-                await loadPanelIntoViewerSilent(pnlPath);
-                loaded++;
-            } catch (err) {
-                ExtensionOutputChannel.warn('LoadAll', `Failed to load ${pnlPath}: ${err}`);
+                try {
+                    await loadPanelIntoViewerSilent(pnlPath);
+                    loaded++;
+                } catch (err) {
+                    ExtensionOutputChannel.warn('LoadAll', `Failed to load ${pnlPath}: ${err}`);
+                }
             }
-        }
 
-        vscode.window.showInformationMessage(`Loaded ${loaded} panels.`);
-    });
+            vscode.window.showInformationMessage(`Loaded ${loaded} panels.`);
+        },
+    );
 
     await vscode.commands.executeCommand('setContext', 'winccoaPanelViewer.panelOpen', true);
 }
@@ -184,7 +199,7 @@ async function loadAllPanelsCommand(): Promise<void> {
  */
 async function findPnlFilesRecursive(dir: string): Promise<string[]> {
     const results: string[] = [];
-    
+
     const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
         const fullPath = path.join(dir, entry.name);
@@ -196,7 +211,7 @@ async function findPnlFilesRecursive(dir: string): Promise<string[]> {
             results.push(fullPath);
         }
     }
-    
+
     return results;
 }
 
@@ -274,7 +289,7 @@ async function loadPanelIntoViewer(filePath: string): Promise<void> {
     // Parse the XML
     const model = parsePanelXml(result.outputPath, filePath);
     treeProvider.addModel(model);
-    
+
     // Show tree view
     await vscode.commands.executeCommand('setContext', 'winccoaPanelViewer.panelOpen', true);
 
@@ -314,10 +329,9 @@ async function pnlToXmlCommand(uri?: vscode.Uri): Promise<void> {
 
     // Handle files without extension
     if (!filePath.toLowerCase().endsWith('.pnl')) {
-        const choice = await vscode.window.showQuickPick(
-            ['Treat as .pnl', 'Skip'],
-            { placeHolder: `File has no .pnl extension: ${path.basename(filePath)}` },
-        );
+        const choice = await vscode.window.showQuickPick(['Treat as .pnl', 'Skip'], {
+            placeHolder: `File has no .pnl extension: ${path.basename(filePath)}`,
+        });
         if (choice !== 'Treat as .pnl') return;
     }
 
@@ -447,12 +461,12 @@ async function previewPanelCommand(uri?: vscode.Uri): Promise<void> {
     _previewPanel(uri, []);
 }
 async function previewPanelWithOptionsCommand(uri?: vscode.Uri): Promise<void> {
-// Prompt user for extra options
-const extraUiViewerOptions = await vscode.window.showInputBox({
-    prompt: 'Extra command-line options for WCCOAui (e.g., -logLevel debug)',
-    placeHolder: '-n -dbg all',
-    value: '',
-});
+    // Prompt user for extra options
+    const extraUiViewerOptions = await vscode.window.showInputBox({
+        prompt: 'Extra command-line options for WCCOAui (e.g., -logLevel debug)',
+        placeHolder: '-n -dbg all',
+        value: '',
+    });
     _previewPanel(uri, extraUiViewerOptions ? extraUiViewerOptions.split(' ') : []);
 }
 
@@ -470,7 +484,7 @@ async function _previewPanel(uri?: vscode.Uri, extraUiViewerOptions?: string[]):
 
     // Get current project from core extension
     const coreExtension = vscode.extensions.getExtension(CORE_EXTENSION_ID);
-    
+
     if (!coreExtension || !coreExtension.exports) {
         vscode.window.showErrorMessage(
             'WinCC OA Project Admin extension not found. Please install it to use preview.',
@@ -480,24 +494,30 @@ async function _previewPanel(uri?: vscode.Uri, extraUiViewerOptions?: string[]):
 
     const currentProject = getSelectedProject();
 
-        if (!currentProject) {
-            return;
-        }
+    if (!currentProject) {
+        return;
+    }
 
     const version = currentProject.getVersion();
-    
+
     if (!version) {
         vscode.window.showErrorMessage(
             `Cannot determine WinCC OA version from project: ${currentProject.getId()}`,
         );
         return;
     }
-   
 
     // project / panels path
-    const projPanelsPath = currentProject.getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH).replace(/\\/g, '/');
+    const projPanelsPath = currentProject
+        .getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH)
+        .replace(/\\/g, '/');
 
-    if (!filePath.replace(/\\/g, '/').toLocaleLowerCase().startsWith(projPanelsPath.toLocaleLowerCase())) {
+    if (
+        !filePath
+            .replace(/\\/g, '/')
+            .toLocaleLowerCase()
+            .startsWith(projPanelsPath.toLocaleLowerCase())
+    ) {
         vscode.window.showWarningMessage(
             `Selected panel is not within the current project's panels directory.\nProject panels path: ${projPanelsPath}\nPanel path: ${filePath}`,
         );
@@ -523,12 +543,14 @@ async function _previewPanel(uri?: vscode.Uri, extraUiViewerOptions?: string[]):
         let args = ['-proj', currentProject.getId()];
 
         if (extraUiViewerOptions) {
-            args.push(...extraUiViewerOptions || []);
+            args.push(...(extraUiViewerOptions || []));
         }
 
-        
-        ExtensionOutputChannel.info('Preview', `Launching WCCOAui v${version} with panel: ${relativePanelPath}`);
-        
+        ExtensionOutputChannel.info(
+            'Preview',
+            `Launching WCCOAui v${version} with panel: ${relativePanelPath}`,
+        );
+
         // Start UI with the panel (detached to not block VS Code)
         await uiComponent.startWithPanel(relativePanelPath, args, (line: string) => {
             ExtensionOutputChannel.debug('Preview', line);
@@ -566,15 +588,72 @@ async function showScriptCommand(script: PanelScript): Promise<void> {
 function setupFileWatcher(context: vscode.ExtensionContext): void {
     fileWatcher = vscode.workspace.createFileSystemWatcher('**/*.pnl');
 
-    fileWatcher.onDidChange(async (uri: vscode.Uri) => {
-        // Skip .bak files
-        if (uri.fsPath.toLowerCase().endsWith('.bak')) return;
+    const shouldIgnore = (uri: vscode.Uri): boolean => {
+        const lower = uri.fsPath.toLowerCase();
+        // Explicitly ignore backup files (even if patterns change later).
+        return lower.endsWith('.bak');
+    };
 
-        // Reload if this is the currently viewed panel
-        if (currentPanelPath && uri.fsPath === currentPanelPath) {
-            ExtensionOutputChannel.debug('Watcher', `Panel changed: ${uri.fsPath}`);
-            await loadPanelIntoViewer(uri.fsPath);
+    const scheduleReload = (uri: vscode.Uri, reason: string): void => {
+        if (!treeProvider) return;
+        if (shouldIgnore(uri)) return;
+
+        const filePath = uri.fsPath;
+
+        // Only auto-reload panels that are already loaded in the viewer.
+        if (!treeProvider.hasModel(filePath) && filePath !== currentPanelPath) return;
+
+        const existing = pendingPanelReloads.get(filePath);
+        if (existing) {
+            clearTimeout(existing);
         }
+
+        pendingPanelReloads.set(
+            filePath,
+            setTimeout(async () => {
+                pendingPanelReloads.delete(filePath);
+                try {
+                    ExtensionOutputChannel.debug('Watcher', `${reason}: ${filePath}`);
+                    await loadPanelIntoViewerSilent(filePath);
+                } catch (err) {
+                    ExtensionOutputChannel.warn(
+                        'Watcher',
+                        `Failed to reload changed panel: ${filePath}: ${
+                            err instanceof Error ? err.message : String(err)
+                        }`,
+                    );
+                }
+            }, 250),
+        );
+    };
+
+    fileWatcher.onDidChange((uri: vscode.Uri) => scheduleReload(uri, 'Panel changed'));
+    fileWatcher.onDidCreate((uri: vscode.Uri) => scheduleReload(uri, 'Panel created'));
+
+    fileWatcher.onDidDelete((uri: vscode.Uri) => {
+        if (!treeProvider) return;
+        if (shouldIgnore(uri)) return;
+
+        const filePath = uri.fsPath;
+        if (pendingPanelReloads.has(filePath)) {
+            clearTimeout(pendingPanelReloads.get(filePath)!);
+            pendingPanelReloads.delete(filePath);
+        }
+
+        if (treeProvider.hasModel(filePath)) {
+            ExtensionOutputChannel.debug('Watcher', `Panel deleted: ${filePath}`);
+            treeProvider.removeModel(filePath);
+        }
+
+        if (currentPanelPath === filePath) {
+            currentPanelPath = undefined;
+        }
+
+        void vscode.commands.executeCommand(
+            'setContext',
+            'winccoaPanelViewer.panelOpen',
+            treeProvider.panelCount > 0,
+        );
     });
 
     context.subscriptions.push(fileWatcher);

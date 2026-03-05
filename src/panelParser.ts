@@ -37,7 +37,9 @@ export function parsePanelXml(xmlPath: string, pnlPath: string): PanelModel {
         const content = fs.readFileSync(xmlPath, 'utf8');
 
         // Extract panel-level properties from <panel><properties>...</properties></panel>
-        const panelPropsMatch = content.match(/<panel[^>]*>\s*<properties>([\s\S]*?)<\/properties>/i);
+        const panelPropsMatch = content.match(
+            /<panel[^>]*>\s*<properties>([\s\S]*?)<\/properties>/i,
+        );
         if (panelPropsMatch) {
             model.properties = extractTopLevelProperties(panelPropsMatch[1]);
         }
@@ -50,7 +52,6 @@ export function parsePanelXml(xmlPath: string, pnlPath: string): PanelModel {
 
         // Extract panel references from entire content
         model.references = extractReferences(content);
-
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         ExtensionOutputChannel.error('Parser', `Failed to parse panel XML: ${message}`);
@@ -66,12 +67,12 @@ export function parsePanelXml(xmlPath: string, pnlPath: string): PanelModel {
  */
 function extractTopLevelProperties(content: string): PanelProperty[] {
     const properties: PanelProperty[] = [];
-    
+
     // Find all <prop> start positions and their depths
     const propStarts: { idx: number; name: string; depth: number }[] = [];
     const propStartRegex = /<prop name="([^"]+)">/g;
     let match;
-    
+
     // First pass: find all prop start tags
     while ((match = propStartRegex.exec(content)) !== null) {
         propStarts.push({
@@ -80,13 +81,16 @@ function extractTopLevelProperties(content: string): PanelProperty[] {
             depth: 0, // Will calculate
         });
     }
-    
+
     // Calculate depth for each prop start
     for (let i = 0; i < propStarts.length; i++) {
         let depth = 0;
         for (let j = 0; j < i; j++) {
             const startJ = propStarts[j].idx;
-            const contentJ = extractPropContent(content, startJ + content.slice(startJ).indexOf('>') + 1);
+            const contentJ = extractPropContent(
+                content,
+                startJ + content.slice(startJ).indexOf('>') + 1,
+            );
             if (contentJ !== null) {
                 const endJ = startJ + content.slice(startJ).indexOf('>') + 1 + contentJ.length + 7; // +7 for </prop>
                 // Check if propStarts[i] is inside propStarts[j]
@@ -97,11 +101,11 @@ function extractTopLevelProperties(content: string): PanelProperty[] {
         }
         propStarts[i].depth = depth;
     }
-    
+
     // Only process top-level props (depth 0)
     for (const prop of propStarts) {
         if (prop.depth > 0) continue; // Skip nested props
-        
+
         const startIdx = prop.idx + content.slice(prop.idx).indexOf('>') + 1;
         const propContent = extractPropContent(content, startIdx);
         if (propContent === null) continue;
@@ -142,13 +146,13 @@ function extractPropContent(content: string, startIdx: number): string | null {
     let depth = 1;
     let idx = startIdx;
     const maxLen = Math.min(startIdx + 10000, content.length);
-    
+
     while (idx < maxLen && depth > 0) {
         const openIdx = content.indexOf('<prop ', idx);
         const closeIdx = content.indexOf('</prop>', idx);
-        
+
         if (closeIdx === -1) return null;
-        
+
         if (openIdx !== -1 && openIdx < closeIdx) {
             depth++;
             idx = openIdx + 6;
@@ -169,33 +173,33 @@ function extractPropContent(content: string, startIdx: number): string | null {
  */
 function extractNestedProperties(content: string): PanelProperty[] {
     const props: PanelProperty[] = [];
-    
+
     // Find immediate child props only (depth 0 within this content)
     const propStarts: { idx: number; name: string }[] = [];
     const propStartRegex = /<prop name="([^"]+)">/g;
     let match;
-    
+
     while ((match = propStartRegex.exec(content)) !== null) {
         propStarts.push({
             idx: match.index,
             name: match[1],
         });
     }
-    
+
     // Track which positions are inside other props (to skip nested)
     const processedRanges: { start: number; end: number }[] = [];
-    
+
     for (const prop of propStarts) {
         // Skip if this prop is inside an already processed prop
         const isNested = processedRanges.some(
-            range => prop.idx > range.start && prop.idx < range.end
+            (range) => prop.idx > range.start && prop.idx < range.end,
         );
         if (isNested) continue;
-        
+
         const startIdx = prop.idx + content.slice(prop.idx).indexOf('>') + 1;
         const propContent = extractPropContent(content, startIdx);
         if (propContent === null) continue;
-        
+
         // Mark this range as processed
         const endIdx = startIdx + propContent.length + 7; // +7 for </prop>
         processedRanges.push({ start: prop.idx, end: endIdx });
@@ -224,7 +228,7 @@ function extractNestedProperties(content: string): PanelProperty[] {
             }
         }
     }
-    
+
     return props;
 }
 
@@ -287,7 +291,7 @@ function extractShapes(content: string): PanelShape[] {
     let match;
 
     while ((match = shapeRegex.exec(content)) !== null) {
-        const [fullMatch, name, shapeType, innerContent] = match;
+        const [, name, shapeType, innerContent] = match;
 
         // Extract properties from shape's <properties> section
         const propsMatch = innerContent.match(/<properties>([\s\S]*?)<\/properties>/i);

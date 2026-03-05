@@ -7,23 +7,32 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import {
-    PanelModel,
-    PanelShape,
-    PanelProperty,
-    PanelScript,
-    PanelReference,
-} from './panelModel';
+import { PanelModel, PanelShape, PanelProperty, PanelScript, PanelReference } from './panelModel';
 
 /**
  * Tree item types for icons and context menus.
  */
 type TreeItemType = 'panel' | 'shape' | 'property' | 'script' | 'reference' | 'folder';
 
+type ChildType =
+    | 'shapes'
+    | 'properties'
+    | 'scripts'
+    | 'references'
+    | 'shape-props'
+    | 'shape-scripts'
+    | 'shape-children'
+    | 'prop-children';
+
 /**
  * Tree item data representing a node in the panel structure tree.
  */
 export class PanelTreeItem extends vscode.TreeItem {
+    public modelPath?: string;
+    public childType?: ChildType;
+    public shapeData?: PanelShape;
+    public propData?: PanelProperty;
+
     constructor(
         public readonly label: string,
         public readonly itemType: TreeItemType,
@@ -32,11 +41,11 @@ export class PanelTreeItem extends vscode.TreeItem {
         public readonly parent?: PanelTreeItem,
     ) {
         super(label, collapsibleState);
-        
+
         this.contextValue = itemType;
         this.iconPath = this.getIcon();
         this.tooltip = this.getTooltip();
-        
+
         // Scripts are clickable to show code
         if (itemType === 'script' && data) {
             this.command = {
@@ -87,7 +96,9 @@ export class PanelTreeItem extends vscode.TreeItem {
  * Tree data provider for panel structure.
  */
 export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem> {
-    private _onDidChangeTreeData = new vscode.EventEmitter<PanelTreeItem | undefined | null | void>();
+    private _onDidChangeTreeData = new vscode.EventEmitter<
+        PanelTreeItem | undefined | null | void
+    >();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
     private models: Map<string, PanelModel> = new Map();
@@ -135,6 +146,13 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
         return this.models.size;
     }
 
+    /**
+     * Returns true if the given panel path is currently loaded in the viewer.
+     */
+    public hasModel(filePath: string): boolean {
+        return this.models.has(filePath);
+    }
+
     getTreeItem(element: PanelTreeItem): vscode.TreeItem {
         return element;
     }
@@ -160,8 +178,10 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
                 'panel',
                 vscode.TreeItemCollapsibleState.Expanded,
             );
-            panelItem.description = model.encrypted ? '🔒 Encrypted' : path.basename(model.filePath);
-            (panelItem as any)._modelPath = model.filePath;
+            panelItem.description = model.encrypted
+                ? '🔒 Encrypted'
+                : path.basename(model.filePath);
+            panelItem.modelPath = model.filePath;
             items.push(panelItem);
         }
 
@@ -170,7 +190,7 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
 
     private getChildItems(parent: PanelTreeItem): PanelTreeItem[] {
         // Find model for this panel item
-        const modelPath = (parent as any)._modelPath || this.findModelPath(parent);
+        const modelPath = parent.modelPath || this.findModelPath(parent);
         const model = modelPath ? this.models.get(modelPath) : undefined;
         if (!model) return [];
 
@@ -187,8 +207,8 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
                     undefined,
                     parent,
                 );
-                (shapesFolder as any)._childType = 'shapes';
-                (shapesFolder as any)._modelPath = modelPath;
+                shapesFolder.childType = 'shapes';
+                shapesFolder.modelPath = modelPath;
                 children.push(shapesFolder);
             }
 
@@ -201,8 +221,8 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
                     undefined,
                     parent,
                 );
-                (propsFolder as any)._childType = 'properties';
-                (propsFolder as any)._modelPath = modelPath;
+                propsFolder.childType = 'properties';
+                propsFolder.modelPath = modelPath;
                 children.push(propsFolder);
             }
 
@@ -215,8 +235,8 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
                     undefined,
                     parent,
                 );
-                (scriptsFolder as any)._childType = 'scripts';
-                (scriptsFolder as any)._modelPath = modelPath;
+                scriptsFolder.childType = 'scripts';
+                scriptsFolder.modelPath = modelPath;
                 children.push(scriptsFolder);
             }
 
@@ -229,8 +249,8 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
                     undefined,
                     parent,
                 );
-                (refsFolder as any)._childType = 'references';
-                (refsFolder as any)._modelPath = modelPath;
+                refsFolder.childType = 'references';
+                refsFolder.modelPath = modelPath;
                 children.push(refsFolder);
             }
 
@@ -251,39 +271,47 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
 
         // Folder children
         if (parent.itemType === 'folder') {
-            const childType = (parent as any)._childType;
-            
+            const childType = parent.childType;
+
             if (childType === 'shapes') {
-                return model.shapes.map(shape => this.createShapeItem(shape, parent, modelPath));
+                return model.shapes.map((shape) => this.createShapeItem(shape, parent, modelPath));
             }
             if (childType === 'properties') {
-                return model.properties.map(prop => this.createPropertyItem(prop, parent, modelPath));
+                return model.properties.map((prop) =>
+                    this.createPropertyItem(prop, parent, modelPath),
+                );
             }
             if (childType === 'scripts') {
-                return model.scripts.map(script => this.createScriptItem(script, parent));
+                return model.scripts.map((script) => this.createScriptItem(script, parent));
             }
             if (childType === 'references') {
-                return model.references.map(ref => this.createReferenceItem(ref, parent));
+                return model.references.map((ref) => this.createReferenceItem(ref, parent));
             }
-            
+
             // Shape's internal folders
-            if (childType === 'shape-props' && (parent as any)._shapeData) {
-                const shape = (parent as any)._shapeData as PanelShape;
-                return shape.properties.map(prop => this.createPropertyItem(prop, parent, modelPath));
+            if (childType === 'shape-props' && parent.shapeData) {
+                const shape = parent.shapeData;
+                return shape.properties.map((prop) =>
+                    this.createPropertyItem(prop, parent, modelPath),
+                );
             }
-            if (childType === 'shape-scripts' && (parent as any)._shapeData) {
-                const shape = (parent as any)._shapeData as PanelShape;
-                return shape.scripts.map(script => this.createScriptItem(script, parent));
+            if (childType === 'shape-scripts' && parent.shapeData) {
+                const shape = parent.shapeData;
+                return shape.scripts.map((script) => this.createScriptItem(script, parent));
             }
-            if (childType === 'shape-children' && (parent as any)._shapeData) {
-                const shape = (parent as any)._shapeData as PanelShape;
-                return shape.children.map(child => this.createShapeItem(child, parent, modelPath));
+            if (childType === 'shape-children' && parent.shapeData) {
+                const shape = parent.shapeData;
+                return shape.children.map((child) =>
+                    this.createShapeItem(child, parent, modelPath),
+                );
             }
-            
+
             // Nested property children
-            if (childType === 'prop-children' && (parent as any)._propData) {
-                const prop = (parent as any)._propData as PanelProperty;
-                return (prop.children || []).map(child => this.createPropertyItem(child, parent, modelPath));
+            if (childType === 'prop-children' && parent.propData) {
+                const prop = parent.propData;
+                return (prop.children || []).map((child) =>
+                    this.createPropertyItem(child, parent, modelPath),
+                );
             }
         }
 
@@ -300,9 +328,9 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
                     undefined,
                     parent,
                 );
-                (folder as any)._childType = 'shape-children';
-                (folder as any)._shapeData = shape;
-                (folder as any)._modelPath = modelPath;
+                folder.childType = 'shape-children';
+                folder.shapeData = shape;
+                folder.modelPath = modelPath;
                 children.push(folder);
             }
 
@@ -314,9 +342,9 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
                     undefined,
                     parent,
                 );
-                (folder as any)._childType = 'shape-props';
-                (folder as any)._shapeData = shape;
-                (folder as any)._modelPath = modelPath;
+                folder.childType = 'shape-props';
+                folder.shapeData = shape;
+                folder.modelPath = modelPath;
                 children.push(folder);
             }
 
@@ -328,68 +356,82 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
                     undefined,
                     parent,
                 );
-                (folder as any)._childType = 'shape-scripts';
-                (folder as any)._shapeData = shape;
-                (folder as any)._modelPath = modelPath;
+                folder.childType = 'shape-scripts';
+                folder.shapeData = shape;
+                folder.modelPath = modelPath;
                 children.push(folder);
             }
 
             return children;
         }
-        
+
         // Property with children (nested/localized)
         if (parent.itemType === 'property' && parent.data) {
             const prop = parent.data as PanelProperty;
             if (prop.children && prop.children.length > 0) {
-                return prop.children.map(child => this.createPropertyItem(child, parent, modelPath));
+                return prop.children.map((child) =>
+                    this.createPropertyItem(child, parent, modelPath),
+                );
             }
         }
 
         return [];
     }
-    
+
     /**
      * Find model path by traversing up parent chain.
      */
     private findModelPath(item: PanelTreeItem): string | undefined {
         let current: PanelTreeItem | undefined = item;
         while (current) {
-            const path = (current as any)._modelPath;
-            if (path) return path;
+            if (current.modelPath) return current.modelPath;
             current = current.parent;
         }
         return this.models.keys().next().value; // fallback to first model
     }
 
-    private createShapeItem(shape: PanelShape, parent: PanelTreeItem, modelPath?: string): PanelTreeItem {
-        const hasChildren = shape.children.length > 0 || shape.properties.length > 0 || shape.scripts.length > 0;
+    private createShapeItem(
+        shape: PanelShape,
+        parent: PanelTreeItem,
+        modelPath?: string,
+    ): PanelTreeItem {
+        const hasChildren =
+            shape.children.length > 0 || shape.properties.length > 0 || shape.scripts.length > 0;
         const item = new PanelTreeItem(
             shape.name,
             'shape',
-            hasChildren ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+            hasChildren
+                ? vscode.TreeItemCollapsibleState.Collapsed
+                : vscode.TreeItemCollapsibleState.None,
             shape,
             parent,
         );
         item.description = shape.shapeType;
         if (modelPath) {
-            (item as any)._modelPath = modelPath;
+            item.modelPath = modelPath;
         }
         return item;
     }
 
-    private createPropertyItem(prop: PanelProperty, parent: PanelTreeItem, modelPath?: string): PanelTreeItem {
+    private createPropertyItem(
+        prop: PanelProperty,
+        parent: PanelTreeItem,
+        modelPath?: string,
+    ): PanelTreeItem {
         // Check if property has nested children
         const hasChildren = prop.children && prop.children.length > 0;
         const item = new PanelTreeItem(
             prop.name,
             'property',
-            hasChildren ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None,
+            hasChildren
+                ? vscode.TreeItemCollapsibleState.Collapsed
+                : vscode.TreeItemCollapsibleState.None,
             prop,
             parent,
         );
         item.description = this.formatPropertyValue(prop);
         if (modelPath) {
-            (item as any)._modelPath = modelPath;
+            item.modelPath = modelPath;
         }
         return item;
     }

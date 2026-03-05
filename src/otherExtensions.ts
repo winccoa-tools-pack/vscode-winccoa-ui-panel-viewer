@@ -24,9 +24,9 @@ export interface ProjectInfo {
     oaInstallPath: string;
 }
 
-export let extraUiViewerOptions : string;
+export let extraUiViewerOptions: string;
 
-export function getSelectedProject() : ProjEnvProject | null {
+export function getSelectedProject(): ProjEnvProject | null {
     const coreExtension = vscode.extensions.getExtension(CORE_EXTENSION_ID);
 
     if (!coreExtension || !coreExtension.isActive) {
@@ -36,19 +36,21 @@ export function getSelectedProject() : ProjEnvProject | null {
         return null;
     }
 
-    const currentSelectedProject = coreExtension.exports.getCurrentProject() as ProjectInfo | undefined;
-        
-        if (!currentSelectedProject) {
-            vscode.window.showWarningMessage(
-                'No WinCC OA project selected. Please select a project in the WinCC OA Project Admin extension.',
-            );
-            return null;
-        }
-        
-        const currentProject = new ProjEnvProject();
-        currentProject.setId(currentSelectedProject.name);
+    const currentSelectedProject = coreExtension.exports.getCurrentProject() as
+        | ProjectInfo
+        | undefined;
 
-        return currentProject;
+    if (!currentSelectedProject) {
+        vscode.window.showWarningMessage(
+            'No WinCC OA project selected. Please select a project in the WinCC OA Project Admin extension.',
+        );
+        return null;
+    }
+
+    const currentProject = new ProjEnvProject();
+    currentProject.setId(currentSelectedProject.name);
+
+    return currentProject;
 }
 
 /**

@@ -86,8 +86,8 @@ Ship an MVP that provides reliable panel inspection, reduces developer friction 
 - **Integration**
   - [x] Preview launcher using UIComponent from npm-winccoa-core
   - [x] Preview launcher option to pass extra user-defined UI arguments (ui.viewer)
-  - [ ] Change detection and automatic re-conversion (file watcher)
-  - [ ] WinCC OA version picker (uses version from selected project)
+  - [x] Change detection and automatic re-conversion (file watcher)
+  - [x] WinCC OA version picker (uses version from selected project)
   - [ ] Config path auto-detection from workspace
 
 - **AI Integration (MUST HAVE)**
