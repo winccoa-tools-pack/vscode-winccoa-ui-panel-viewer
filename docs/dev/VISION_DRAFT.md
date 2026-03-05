@@ -84,7 +84,7 @@ Ship an MVP that provides reliable panel inspection, reduces developer friction 
 ### 🔲 In Progress / Next Steps
 
 - **Viewer UI Enhancements**
-  - [ ] Details pane for properties and scripts
+  - [x] Details pane for properties and scripts
   - [ ] Syntax-highlighted CTL script view (webview)
   - [ ] Color value preview in properties
   - [ ] Font preview

@@ -108,6 +108,11 @@
         {
           "id": "winccoaPanelStructure",
           "name": "Panel Structure"
+        },
+        {
+          "id": "winccoaPanelDetails",
+          "name": "Details",
+          "type": "webview"
         }
       ]
     },
@@ -115,6 +120,10 @@
       {
         "view": "winccoaPanelStructure",
         "contents": "No panel loaded.\n[Open Panel](command:winccoaPanelViewer.openPanel)\n[Load All Panels from Project](command:winccoaPanelViewer.loadAllPanels)\nOr right-click a .pnl file in Explorer → 'WinCC OA: Open Panel'"
+      },
+      {
+        "view": "winccoaPanelDetails",
+        "contents": "Select a property or script in the tree to see details."
       }
     ],
     "menus": {

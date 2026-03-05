@@ -19,6 +19,7 @@ import { PanelTreeProvider } from './panelTreeProvider';
 import { parsePanelXml } from './panelParser';
 import { createEncryptedPanelModel } from './panelModel';
 import { PanelScript } from './panelModel';
+import { PanelDetailsView } from './panelDetailsView';
 import { UIComponent } from '@winccoa-tools-pack/npm-winccoa-core/types/components/implementations/index';
 import { getSelectedProject } from './otherExtensions';
 import { CORE_EXTENSION_ID } from './const';
@@ -26,6 +27,9 @@ import { ProjEnvProjectFileSysStruct } from '@winccoa-tools-pack/npm-winccoa-cor
 
 /** Singleton tree provider instance */
 let treeProvider: PanelTreeProvider | undefined;
+
+/** Details view provider instance */
+let detailsViewProvider: PanelDetailsView | undefined;
 
 /** File watcher for .pnl changes */
 let fileWatcher: vscode.FileSystemWatcher | undefined;
@@ -47,6 +51,22 @@ export function registerCommands(context: vscode.ExtensionContext): void {
         showCollapseAll: true,
     });
     context.subscriptions.push(treeView);
+
+    // Register details pane (webview view)
+    detailsViewProvider = new PanelDetailsView();
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            PanelDetailsView.viewType,
+            detailsViewProvider,
+        ),
+    );
+
+    // Update details pane when selection changes
+    context.subscriptions.push(
+        treeView.onDidChangeSelection((e) => {
+            detailsViewProvider?.setSelection(e.selection[0]);
+        }),
+    );
 
     // Register commands
     context.subscriptions.push(
@@ -211,6 +231,7 @@ async function findPnlFilesRecursive(dir: string): Promise<string[]> {
 async function clearPanelsCommand(): Promise<void> {
     if (!treeProvider) return;
     treeProvider.clear();
+    detailsViewProvider?.setSelection(undefined);
     await vscode.commands.executeCommand('setContext', 'winccoaPanelViewer.panelOpen', false);
     vscode.window.showInformationMessage('Panel viewer cleared.');
 }
