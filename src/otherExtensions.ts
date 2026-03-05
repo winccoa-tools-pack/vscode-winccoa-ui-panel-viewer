@@ -9,6 +9,7 @@
 import * as vscode from 'vscode';
 import { ExtensionOutputChannel } from './extensionOutput';
 import { EXTENSION_CONFIG_SECTION, CORE_EXTENSION_ID } from './const';
+import { ProjEnvProject } from '@winccoa-tools-pack/npm-winccoa-core';
 
 /**
  * Interface representing a WinCC OA project.
@@ -21,6 +22,33 @@ export interface ProjectInfo {
     name: string;
     /** The installation path of WinCC OA for this project */
     oaInstallPath: string;
+}
+
+export let extraUiViewerOptions : string;
+
+export function getSelectedProject() : ProjEnvProject | null {
+    const coreExtension = vscode.extensions.getExtension(CORE_EXTENSION_ID);
+
+    if (!coreExtension || !coreExtension.isActive) {
+        vscode.window.showWarningMessage(
+            'WinCC OA Core extension not available. Please ensure it is installed and active.',
+        );
+        return null;
+    }
+
+    const currentSelectedProject = coreExtension.exports.getCurrentProject() as ProjectInfo | undefined;
+        
+        if (!currentSelectedProject) {
+            vscode.window.showWarningMessage(
+                'No WinCC OA project selected. Please select a project in the WinCC OA Project Admin extension.',
+            );
+            return null;
+        }
+        
+        const currentProject = new ProjEnvProject();
+        currentProject.setId(currentSelectedProject.name);
+
+        return currentProject;
 }
 
 /**
@@ -72,19 +100,7 @@ export async function setupCoreExtensionIntegration(
 
     coreIntegrationSetupInFlight = (async () => {
         const config = vscode.workspace.getConfiguration(EXTENSION_CONFIG_SECTION);
-        const pathSource = config.get<string>('pathSource', 'automatic');
-
-        if (pathSource !== 'automatic') {
-            ExtensionOutputChannel.info(
-                'CoreIntegration',
-                'Static mode - Core extension integration disabled',
-            );
-            if (coreProjectChangeUnsubscribe) {
-                coreProjectChangeUnsubscribe();
-                coreProjectChangeUnsubscribe = undefined;
-            }
-            return;
-        }
+        extraUiViewerOptions = config.get<string>('extraUiViewerOptions', '');
 
         const coreExtension = vscode.extensions.getExtension(CORE_EXTENSION_ID);
 

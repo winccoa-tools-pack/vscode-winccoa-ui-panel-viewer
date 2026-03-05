@@ -41,10 +41,6 @@
   "contributes": {
     "commands": [
       {
-        "command": "winccoa.helloWorld",
-        "title": "WinCC OA: Hello World"
-      },
-      {
         "command": "winccoaPanelViewer.openPanel",
         "title": "WinCC OA: Open Panel in Viewer"
       },
@@ -74,7 +70,21 @@
       },
       {
         "command": "winccoaPanelViewer.previewPanel",
-        "title": "WinCC OA: Preview Panel in UI"
+        "title": "WinCC OA: Preview Panel in UI",
+        "category": "WinCC OA Panel Viewer",
+        "icon": {
+          "light": "resources/preview-light.svg",
+          "dark": "resources/preview-dark.svg"
+        }
+      },
+      {
+        "command": "winccoaPanelViewer.previewPanelWithOptions",
+        "title": "WinCC OA: Preview Panel in UI with Options",
+        "category": "WinCC OA Panel Viewer",
+        "icon": {
+          "light": "resources/preview-light.svg",
+          "dark": "resources/preview-dark.svg"
+        }
       }
     ],
     "viewsContainers": {
@@ -131,11 +141,21 @@
           "command": "winccoaPanelViewer.previewPanel",
           "when": "resourceExtname == .pnl",
           "group": "winccoa@4"
+        },
+        {
+          "command": "winccoaPanelViewer.previewPanelWithOptions",
+          "when": "resourceExtname == .pnl",
+          "group": "winccoa@4"
         }
       ],
       "view/title": [
         {
           "command": "winccoaPanelViewer.previewPanel",
+          "when": "view == winccoaPanelStructure",
+          "group": "navigation"
+        },
+        {
+          "command": "winccoaPanelViewer.previewPanelWithOptions",
           "when": "view == winccoaPanelStructure",
           "group": "navigation"
         }
@@ -144,16 +164,6 @@
     "configuration": {
       "title": "WinCC OA Panel Viewer",
       "properties": {
-        "winccoaPanelViewer.winccoaVersion": {
-          "type": "string",
-          "default": "3.20",
-          "description": "WinCC OA version to use for panel conversion (e.g., 3.20, 3.21). TODO: Will be auto-detected from winccoa-project-admin extension."
-        },
-        "winccoaPanelViewer.winccoaBinPath": {
-          "type": "string",
-          "default": "",
-          "description": "Path to WinCC OA bin directory for preview launcher (e.g., C:\\Siemens\\Automation\\WinCC_OA\\3.20\\bin). Falls back to WINCCOA_PATH if not set."
-        },
         "winccoaPanelViewer.logLevel": {
           "type": "string",
           "enum": ["ERROR", "WARN", "INFO", "DEBUG", "TRACE"],

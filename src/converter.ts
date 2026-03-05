@@ -14,10 +14,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { pnlToXml, xmlToPnl } from '@winccoa-tools-pack/npm-winccoa-ui-pnl-xml';
 import { ExtensionOutputChannel } from './extensionOutput';
+import { getSelectedProject } from './otherExtensions';
 
-// TODO: Implement version picker using RichardJanisch.winccoa-project-admin extension API (coming soon)
-// For now, defaults to WinCC OA 3.20 or reads from configuration
-const DEFAULT_WINCCOA_VERSION = '3.20';
 
 // TODO: Get config path from winccoa-project-admin extension when available
 // Hardcoded for playground/testing
@@ -54,11 +52,20 @@ export async function isEncryptedPanel(filePath: string): Promise<boolean> {
  * Gets the WinCC OA version to use for conversion.
  * TODO: Integrate with RichardJanisch.winccoa-project-admin extension to pick version dynamically
  */
-function getWinccoaVersion(): string {
-    const config = vscode.workspace.getConfiguration('winccoaPanelViewer');
-    const configuredVersion = config.get<string>('winccoaVersion');
-    // TODO: Get version from winccoa-project-admin extension when available
-    return configuredVersion || DEFAULT_WINCCOA_VERSION;
+function getWinccoaVersion(): string | undefined {
+    const currentProject = getSelectedProject();
+    
+            if (!currentProject) {
+                return undefined;
+            }
+
+    if (!currentProject.getVersion()) {
+        vscode.window.showWarningMessage(
+            `Unable to determine WinCC OA version from the selected project ${currentProject.getId()}.`,
+        );
+    }
+
+    return currentProject.getVersion();  
 }
 
 /**

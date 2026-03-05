@@ -19,6 +19,10 @@ import { PanelTreeProvider } from './panelTreeProvider';
 import { parsePanelXml } from './panelParser';
 import { createEncryptedPanelModel } from './panelModel';
 import { PanelScript } from './panelModel';
+import { UIComponent } from '@winccoa-tools-pack/npm-winccoa-core/types/components/implementations/index';
+import { ProjectInfo, extraUiViewerOptions, getSelectedProject } from './otherExtensions';
+import { CORE_EXTENSION_ID } from './const';
+import { ProjEnvProject, ProjEnvProjectFileSysStruct } from '@winccoa-tools-pack/npm-winccoa-core';
 
 /** Singleton tree provider instance */
 let treeProvider: PanelTreeProvider | undefined;
@@ -62,6 +66,7 @@ export function registerCommands(context: vscode.ExtensionContext): void {
         
         // Preview launcher
         vscode.commands.registerCommand('winccoaPanelViewer.previewPanel', previewPanelCommand),
+        vscode.commands.registerCommand('winccoaPanelViewer.previewPanelWithOptions', previewPanelWithOptionsCommand),
         
         // Show script in editor
         vscode.commands.registerCommand('winccoaPanelViewer.showScript', showScriptCommand),
@@ -436,8 +441,22 @@ async function convertDirXmlToPnlCommand(uri?: vscode.Uri): Promise<void> {
 
 /**
  * Launches WinCC OA UI to preview a panel.
+ * Uses UIComponent from npm-winccoa-core package.
  */
 async function previewPanelCommand(uri?: vscode.Uri): Promise<void> {
+    _previewPanel(uri, []);
+}
+async function previewPanelWithOptionsCommand(uri?: vscode.Uri): Promise<void> {
+// Prompt user for extra options
+const extraUiViewerOptions = await vscode.window.showInputBox({
+    prompt: 'Extra command-line options for WCCOAui (e.g., -logLevel debug)',
+    placeHolder: '-n -dbg all',
+    value: '',
+});
+    _previewPanel(uri, extraUiViewerOptions ? extraUiViewerOptions.split(' ') : []);
+}
+
+async function _previewPanel(uri?: vscode.Uri, extraUiViewerOptions?: string[]): Promise<void> {
     let filePath: string;
 
     if (uri) {
@@ -449,47 +468,78 @@ async function previewPanelCommand(uri?: vscode.Uri): Promise<void> {
         return;
     }
 
-    // Get relative path from workspace
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    let relativePath = filePath;
+    // Get current project from core extension
+    const coreExtension = vscode.extensions.getExtension(CORE_EXTENSION_ID);
     
-    if (workspaceFolders) {
-        for (const folder of workspaceFolders) {
-            if (filePath.startsWith(folder.uri.fsPath)) {
-                relativePath = path.relative(folder.uri.fsPath, filePath);
-                break;
-            }
-        }
-    }
-
-    // Normalize path separators for WinCC OA
-    relativePath = relativePath.replace(/\\/g, '/');
-
-    // Get WinCC OA UI executable
-    const config = vscode.workspace.getConfiguration('winccoaPanelViewer');
-    const winccoaBinPath = config.get<string>('winccoaBinPath') || process.env.WINCCOA_PATH;
-    
-    if (!winccoaBinPath) {
+    if (!coreExtension || !coreExtension.exports) {
         vscode.window.showErrorMessage(
-            'WinCC OA path not configured. Set winccoaPanelViewer.winccoaBinPath or WINCCOA_PATH environment variable.',
+            'WinCC OA Project Admin extension not found. Please install it to use preview.',
         );
         return;
     }
 
-    const uiExe = process.platform === 'win32' ? 'WCCOAui.exe' : 'WCCOAui';
-    const uiPath = path.join(winccoaBinPath, 'bin', uiExe);
+    const currentProject = getSelectedProject();
 
-    if (!fs.existsSync(uiPath)) {
-        vscode.window.showErrorMessage(`WinCC OA UI not found: ${uiPath}`);
+        if (!currentProject) {
+            return;
+        }
+
+    const version = currentProject.getVersion();
+    
+    if (!version) {
+        vscode.window.showErrorMessage(
+            `Cannot determine WinCC OA version from project: ${currentProject.getId()}`,
+        );
         return;
     }
+   
 
-    // Launch preview
-    const terminal = vscode.window.createTerminal('WinCC OA Preview');
-    terminal.sendText(`"${uiPath}" -p "${relativePath}"`);
-    terminal.show();
+    // project / panels path
+    const projPanelsPath = currentProject.getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH).replace(/\\/g, '/');
 
-    ExtensionOutputChannel.info('Preview', `Launching preview: ${relativePath}`);
+    if (!filePath.replace(/\\/g, '/').toLocaleLowerCase().startsWith(projPanelsPath.toLocaleLowerCase())) {
+        vscode.window.showWarningMessage(
+            `Selected panel is not within the current project's panels directory.\nProject panels path: ${projPanelsPath}\nPanel path: ${filePath}`,
+        );
+        return;
+    }
+    // Calculate relative path from project panels directory
+    // The panel path for WCCOAui -p should be relative to the project
+    let relativePanelPath = filePath.substring(projPanelsPath.length);
+
+    try {
+        // Create and configure UIComponent
+        const uiComponent = new UIComponent();
+        uiComponent.setVersion(version);
+
+        // Check if executable exists
+        if (!uiComponent.exists()) {
+            vscode.window.showErrorMessage(
+                `WinCC OA UI executable not found for version ${version}`,
+            );
+            return;
+        }
+
+        let args = ['-proj', currentProject.getId()];
+
+        if (extraUiViewerOptions) {
+            args.push(...extraUiViewerOptions || []);
+        }
+
+        
+        ExtensionOutputChannel.info('Preview', `Launching WCCOAui v${version} with panel: ${relativePanelPath}`);
+        
+        // Start UI with the panel (detached to not block VS Code)
+        await uiComponent.startWithPanel(relativePanelPath, args, (line: string) => {
+            ExtensionOutputChannel.debug('Preview', line);
+        });
+
+        vscode.window.showInformationMessage(`Previewing panel: ${path.basename(filePath)}`);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        ExtensionOutputChannel.error('Preview', `Failed to launch preview: ${message}`);
+        vscode.window.showErrorMessage(`Failed to launch preview: ${message}`);
+    }
 }
 
 /**

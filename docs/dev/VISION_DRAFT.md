@@ -2,7 +2,10 @@
 
 ## Vision
 
-Enable engineers to quickly inspect WinCC OA UI panels inside VS Code with a fast, read-only viewer that transforms opaque `.pnl` files into a clear, navigable representation and an optional runtime preview. The viewer should make panel structure, properties, and scripts discoverable without requiring the WinCC OA IDE.
+Enable engineers to quickly inspect WinCC OA UI panels inside VS Code with a fast, read-only viewer
+that transforms opaque `.pnl` files into a clear, navigable representation and an optional runtime
+preview. The viewer should make panel structure, properties, and scripts discoverable without
+requiring the WinCC OA IDE.
 
 ## Mission
 
@@ -23,6 +26,7 @@ Ship an MVP that provides reliable panel inspection, reduces developer friction 
 - Detect encrypted panels and show clear, actionable messaging.
 - Watch `.pnl` changes and reload the viewer automatically; ignore `.bak` files.
 - Provide conversion commands: `pnl → xml`, `xml → pnl`, and recursive directory conversions.
+- **Integrate LanguageModelToolsService** to expose panel structure and properties to Copilot/AI assistants.
 
 ## Out of scope (MVP v1)
 
@@ -80,10 +84,14 @@ Ship an MVP that provides reliable panel inspection, reduces developer friction 
   - [ ] Font preview
 
 - **Integration**
-  - [ ] Preview launcher using `-p <relative/panel.pnl>` argument
+  - [x] Preview launcher using UIComponent from npm-winccoa-core
+  - [x] Preview launcher option to pass extra user-defined UI arguments (ui.viewer)
   - [ ] Change detection and automatic re-conversion (file watcher)
-  - [ ] WinCC OA version picker (currently hardcoded 3.20)
+  - [ ] WinCC OA version picker (uses version from selected project)
   - [ ] Config path auto-detection from workspace
+
+- **AI Integration (MUST HAVE)**
+  - [ ] LanguageModelToolsService integration for Copilot/AI assistants
 
 - **Error Handling**
   - [ ] Detect and clearly report encrypted panels
@@ -114,10 +122,6 @@ Ship an MVP that provides reliable panel inspection, reduces developer friction 
 - Encrypted/unsupported panel formats: detect early and show explicit guidance instead of failing silently.
 - Toolchain differences across OSes: document and test supported invocation patterns; isolate platform-specific code behind an adapter.
 
-## Call to action
-
-Please review this draft and tell me which sections you'd like expanded, shortened, or reworded. I can iterate on the draft, produce a condensed one-page summary, or prepare a more detailed design doc for the validator/schema work.
-
 ---
 
-Last updated: 2026-03-04
+Last updated: 2026-03-05
