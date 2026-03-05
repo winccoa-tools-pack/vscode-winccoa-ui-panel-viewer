@@ -81,11 +81,13 @@ Ship an MVP that provides reliable panel inspection, reduces developer friction 
   - [x] Change detection and automatic re-conversion (file watcher)
   - [x] WinCC OA version picker (uses version from selected project)
 
+- **Viewer UI Enhancements**
+  - [x] Details pane for properties and scripts
+  - [x] Syntax-highlighted CTL script view (webview)
+
 ### 🔲 In Progress / Next Steps
 
 - **Viewer UI Enhancements**
-  - [x] Details pane for properties and scripts
-  - [ ] Syntax-highlighted CTL script view (webview)
   - [ ] Color value preview in properties
   - [ ] Font preview
 

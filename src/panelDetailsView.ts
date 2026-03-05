@@ -147,7 +147,7 @@ ${children}
         if (item.itemType === 'script' && item.data) {
             const script = item.data as PanelScript;
             const event = escapeHtml(script.event);
-            const code = escapeHtml(script.code ?? '');
+          const code = escapeHtml(script.code ?? '');
 
             return `
 <div class="row"><span class="key">Event</span>${event}</div>

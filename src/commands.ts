@@ -20,6 +20,7 @@ import { parsePanelXml } from './panelParser';
 import { createEncryptedPanelModel } from './panelModel';
 import { PanelScript } from './panelModel';
 import { PanelDetailsView } from './panelDetailsView';
+import { VirtualCtlProvider } from './virtualCtlProvider';
 import { UIComponent } from '@winccoa-tools-pack/npm-winccoa-core/types/components/implementations/index';
 import { getSelectedProject } from './otherExtensions';
 import { CORE_EXTENSION_ID } from './const';
@@ -30,6 +31,9 @@ let treeProvider: PanelTreeProvider | undefined;
 
 /** Details view provider instance */
 let detailsViewProvider: PanelDetailsView | undefined;
+
+/** Virtual CTL provider for showing scripts as <event>.ctl */
+let virtualCtlProvider: VirtualCtlProvider | undefined;
 
 /** File watcher for .pnl changes */
 let fileWatcher: vscode.FileSystemWatcher | undefined;
@@ -58,6 +62,15 @@ export function registerCommands(context: vscode.ExtensionContext): void {
         vscode.window.registerWebviewViewProvider(
             PanelDetailsView.viewType,
             detailsViewProvider,
+        ),
+    );
+
+    // Register virtual CTL provider (so scripts open as read-only virtual .ctl docs)
+    virtualCtlProvider = new VirtualCtlProvider();
+    context.subscriptions.push(
+        vscode.workspace.registerTextDocumentContentProvider(
+            VirtualCtlProvider.scheme,
+            virtualCtlProvider,
         ),
     );
 
@@ -581,11 +594,28 @@ async function _previewPanel(uri?: vscode.Uri, extraUiViewerOptions?: string[]):
 async function showScriptCommand(script: PanelScript): Promise<void> {
     if (!script || !script.code) return;
 
-    // Create a temporary document with CTL content
-    const doc = await vscode.workspace.openTextDocument({
-        content: script.code,
-        language: 'ctl', // Assumes CTL language extension is installed
-    });
+    // Open as a virtual <event>.ctl document, so VS Code detects the language by extension.
+    const provider = virtualCtlProvider;
+    if (!provider) {
+        // Fallback to previous behavior (shouldn't happen).
+        const doc = await vscode.workspace.openTextDocument({
+            content: script.code,
+            language: 'ctl',
+        });
+        await vscode.window.showTextDocument(doc, {
+            preview: true,
+            viewColumn: vscode.ViewColumn.Beside,
+        });
+        return;
+    }
+
+    const panelPath = currentPanelPath ?? 'panel.pnl';
+    const uri = provider.createScriptUri(panelPath, script.event);
+    provider.setContent(uri, script.code);
+
+    const doc = await vscode.workspace.openTextDocument(uri);
+    // Ensure language mode is ctl even if no CTL extension is installed.
+    await vscode.languages.setTextDocumentLanguage(doc, 'ctrl');
 
     await vscode.window.showTextDocument(doc, {
         preview: true,
