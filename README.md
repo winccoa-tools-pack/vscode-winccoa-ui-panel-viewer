@@ -1,158 +1,95 @@
-# WinCC OA VS Code Extension Template
+# WinCC OA UI Panel Viewer
 
 <div align="center">
 
-![Version](https://img.shields.io/github/v/release/winccoa-tools-pack/template-vscode-extension?label=version)
-![License](https://img.shields.io/github/license/winccoa-tools-pack/template-vscode-extension)
+![Version](https://img.shields.io/github/v/release/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer?label=version)
+![License](https://img.shields.io/github/license/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer)
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.109.2-007ACC.svg)
-[![Coverage](https://codecov.io/gh/winccoa-tools-pack/template-vscode-extension/graph/badge.svg)](https://codecov.io/gh/winccoa-tools-pack/template-vscode-extension)
-[![Quality gate](https://github.com/winccoa-tools-pack/template-vscode-extension/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/winccoa-tools-pack/template-vscode-extension/actions/workflows/ci-cd.yml)
-[![Released](https://github.com/winccoa-tools-pack/template-vscode-extension/actions/workflows/release.yml/badge.svg)](https://github.com/winccoa-tools-pack/template-vscode-extension/actions/workflows/release.yml)
+[![Coverage](https://codecov.io/gh/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer/graph/badge.svg)](https://codecov.io/gh/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer)
+[![Quality gate](https://github.com/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer/actions/workflows/ci-cd.yml)
+[![Released](https://github.com/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer/actions/workflows/release.yml/badge.svg)](https://github.com/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer/actions/workflows/release.yml)
 
 </div>
 
-Template repository for building **VS Code extensions for WinCC OA**, with a GitFlow-style branching model and a CI → prerelease → release pipeline.
+A fast, read-only VS Code extension that transforms opaque WinCC OA `.pnl` panel files into a navigable, structured tree view — letting you inspect shapes, properties, scripts, and references without leaving your editor.
 
-## Quick start
-
-Create a new repository from this template, then:
-
-```bash
-npm install
-npm run compile
-npm run test:unit
-```
-
-Run locally in VS Code:
-
-To launch this extension, press **F5** in your VS Code instance to open an **Extension Development Host**.
-
-## Customize the template
-
-When you create a new repository from this template, update these placeholders first.
-
-Update values in `package.json`:
-
-- `name`, `displayName`, `description`
-- `publisher` (VS Code Marketplace publisher ID) - **Note:** It's recommended to use the organization's publisher for easier trust and no need for individual VSCE tokens.
-- `icon` (this repo includes a placeholder at `resources/icon.png` — replace it with your own 128x128 (or 256x256) PNG)
-- `repository.url`, `bugs.url`, `homepage` (remove `<your-repository>` placeholders)
-- `activationEvents` and `contributes.commands[].command`
-
-Example:
-
-```bash
-npm pkg set name='vscode-my-extension'
-npm pkg set displayName='WinCC OA — My Extension'
-# Optional: Set your own publisher if not using the organization's
-# npm pkg set publisher='my-publisher'  # Requires VSCE_PAT and user trust
-```
-
-Additionally, this template includes a dummy "Hello World" project. Search for and replace the following placeholders throughout the codebase:
-
-- `'hello-world'` → your extension's identifier or name
-- `'<your-repository>'` → your repository name
-
-Also, update `src/const.ts` with the appropriate values for `EXTENSION_ID`, `EXTENSION_NAME`, and `EXTENSION_CONFIG_SECTION`.
-
-### Template checklist
-
-- Replace the placeholder icon in `resources/icon.png`.
-- Replace all occurrences of `<your-repository>` with your actual repository name.
-- Update the Marketplace identifiers (`publisher`, `name`) before publishing.
-- Update links in `package.json` (`repository`, `bugs`, `homepage`) so they point to your new repo.
-
-## Development scripts
-
-These scripts exist in this template:
-
-- Build: `npm run compile`
-- Watch: `npm run watch`
-- Lint: `npm run lint` and `npm run lint:md`
-- Format check: `npm run format:check`
-- Unit tests: `npm run test:unit`
-- Integration tests (WinCC OA container): `npm run ci:integration`
-
-## Branching model (GitFlow)
-
-- `develop` is the default branch (day-to-day work)
-- `main` is the stable branch (releases)
-- `feature/*` / `bugfix/*` target `develop`
-- `release/vX.Y.Z` and `hotfix/vX.Y.Z` target `main`
-
-Automation overview:
-
-- PR validation: `.github/workflows/gitflow-validation.yml`
-- Upmerge `main` → `develop` via PR: `.github/workflows/gitflow.yml`
-- Create release/hotfix branches + PR: `.github/workflows/create-release-branch.yml`
-  - Important: this workflow does **not** update `CHANGELOG.md`.
-
-More details:
-
-- `docs/automation/GITFLOW_WORKFLOW.md`
-
-## CI + Integration tests
-
-- CI pipeline: `.github/workflows/ci-cd.yml`
-- WinCC OA integration tests: `.github/workflows/integration-winccoa.yml`
-
-More details:
-
-- `docs/automation/CI-INTEGRATION.md`
-
-## Pre-release + release pipeline
-
-This template uses a **tested-artifact flow**:
-
-1. A prerelease workflow builds/tests and uploads a VSIX to a GitHub **pre-release**.
-2. The stable release workflow requires that prerelease artifact and republishes that tested VSIX.
-
-Workflows:
-
-- `.github/workflows/pre-release.yml` (alpha prerelease on PRs to `main`)
-- `.github/workflows/release.yml` + `.github/workflows/release-reusable.yml` (stable release from `main`)
-
-Marketplace publishing:
-
-- Optional secret: `VSCE_PAT` (if set, the release workflow publishes to the VS Code Marketplace).
-
-## First-time setup checklist
-
-- Fill out the vision document: `docs/dev/VISION.md`.
-- Update placeholders in `package.json` (name, publisher, repo URLs, command IDs).
-- Decide on your default branch strategy (this template assumes `develop` is default).
-- Configure secrets (as needed):
-  - `VSCE_PAT` (optional) to publish to VS Code Marketplace during stable release.
-  - `REPO_ADMIN_TOKEN` (recommended) to let `.github/workflows/apply-settings-and-rulesets.yml` apply `.github/repository.settings.yml` and `.github/rulesets/*`.
-  - `DOCKER_USER` + `DOCKER_PASSWORD` (optional) only if your WinCC OA image is private on Docker Hub.
-- Run Actions once to verify everything:
-  - `CI/CD Pipeline`
-  - `PR Labels` (open a PR to see labels apply)
-  - `Git Flow Validation` (open a PR to see validation)
-  - `Integration Tests - WinCC OA` (optional; requires a working image)
-
-## Repo settings + rulesets automation
-
-This template can apply repository settings + rulesets from YAML:
-
-- Source of truth:
-  - `.github/repository.settings.yml`
-  - `.github/rulesets/*.yml`
-- Workflow:
-  - `.github/workflows/apply-settings-and-rulesets.yml`
-
-To apply settings/rulesets, provide an admin-capable token:
-
-- Secret: `REPO_ADMIN_TOKEN`
-  - Classic PAT: scope `repo` (and authorize SSO if required)
-  - Fine-grained PAT: repository access + **Administration: Read and write**
+Part of the [WinCC OA Tools Pack](https://marketplace.visualstudio.com/items?itemName=mPokornyETM.wincc-oa-tools-pack).
 
 ---
 
-## 🛠️ Requirements
+## Features
 
-- **VS Code:** 1.107.1 or higher
-- **WinCC OA:** 3.19+ installed on your system
+### Panel Tree View
+
+Open any `.pnl` or `.xml` panel file and see its structure as a collapsible tree: shapes, sub-shapes, properties, scripts, and references — all organized in a clear hierarchy. Directory-aware grouping keeps multi-panel projects tidy.
+
+### Details Pane
+
+Select any shape or property node in the tree to view its full details in a dedicated side panel.
+
+### Virtual CTL Script Documents
+
+Click a script node to open its CTL source as a read-only virtual document with full syntax highlighting — no need to extract scripts manually.
+
+### Live File Watcher
+
+The extension watches for changes to loaded `.pnl` files and automatically refreshes the tree when a panel is saved externally (e.g. from the WinCC OA GEDI editor).
+
+### Panel Preview (WinCC OA native UI)
+
+Launch `WCCOAui` directly from VS Code to preview a panel in the native WinCC OA runtime — one click from the tree view or the Command Palette.
+
+### PNL ↔ XML Conversion
+
+Convert individual files or entire directories between the binary `.pnl` format and human-readable `.xml` — useful for diffing, code review, or version control.
+
+### Panel Syntax Check
+
+Run `WCCOAui -syntax` on any panel from the Command Palette, the Explorer context menu, or the tree view title bar. The extension surfaces lines containing **WARNING**, **SEVERE**, or **FATAL** from the WinCC OA output so you can quickly spot problems.
+
+---
+
+## Requirements
+
+- **VS Code** 1.109.2 or higher
+- **WinCC OA** 3.19+ installed on your system
+- Companion extension: [WinCC OA Project Admin](https://marketplace.visualstudio.com/items?itemName=RichardJanisch.winccoa-project-admin) (provides project context used by this extension)
+
+---
+
+## Experimental: AI / LLM Integration
+
+This extension includes an **experimental** integration with VS Code language-model tools
+so assistants like GitHub Copilot can inspect and validate WinCC OA panels.
+APIs, behavior, and tool names may still change.
+
+**Current benefits (experimental):**
+
+- **Panel structure as JSON** – AI can call tools to read the parsed panel model
+  (shapes, properties, scripts, references, basic errors) and reason about it.
+- **Summarize panels** – AI can get a compact, natural-language style summary with
+  key shape types, script events, and error counts to quickly understand a panel.
+- **Open panels in UI viewer** – AI can open `.pnl` or `.xml` panels in the WinCC OA
+  UI viewer (with XML converted to PNL on the fly) without you leaving the chat.
+- **On-demand pnl ↔ xml conversion** – AI can trigger single-file or directory
+  conversions between `.pnl` and `.xml`, so you can ask it to "convert this
+  directory to XML and inspect panel X".
+- **Panel syntax check via `-syntax`** – AI (and now a VS Code command) can run
+  `WCCOAui -syntax` for a panel and surface lines containing `WARNING`, `SEVERE`,
+  or `FATAL` from stderr/logs, helping you quickly see whether a panel is
+  obviously broken.
+- **Auto-loading by file path** – Most tools accept an absolute panel path and
+  will load the panel into the internal tree on demand; you do **not** need to
+  manually open the panel first.
+
+Safety-wise, these AI tools are currently **read-only** for panel content; they
+either inspect panels or run conversions/syntax checks you explicitly ask for.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, build scripts, branching model, and CI details.
 
 ---
 
@@ -162,15 +99,18 @@ MIT License. See <https://github.com/winccoa-tools-pack/.github/blob/main/LICENS
 
 ---
 
-## ⚠️ Disclaimer
+## Disclaimer
 
-**WinCC OA** and **Siemens** are trademarks of Siemens AG. This project is not affiliated with, endorsed by, or sponsored by Siemens AG. This is a community-driven open source project created to enhance the development experience for WinCC OA developers.
+**WinCC OA** and **Siemens** are trademarks of Siemens AG. This project is not
+affiliated with, endorsed by, or sponsored by Siemens AG. This is a
+community-driven open source project created to enhance the development
+experience for WinCC OA developers.
 
 ---
 
 ## Quick Links
 
-• [📦 VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mPokornyETM.wincc-oa-tools-pack)
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=mPokornyETM.wincc-oa-tools-pack)
 
 ---
 
