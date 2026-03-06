@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<panel version="14">
+    <properties>
+        <prop name="windowTitle">Test Panel</prop>
+        <prop name="backColor">_3DFace</prop>
+        <prop name="panelSize">800,600</prop>
+    </properties>
+    <shapes>
+        <shape Name="myButton" shapeType="PUSH_BUTTON">
+            <properties>
+                <prop name="text">Click Me</prop>
+                <prop name="backCol">Blue</prop>
+            </properties>
+            <events>
+                <script name="Clicked"><![CDATA[
+                    main()
+                    {
+                        DebugN("Button clicked!");
+                    }
+                ]]></script>
+            </events>
+        </shape>
+        <shape Name="myLabel" shapeType="PRIMITIVE_TEXT">
+            <properties>
+                <prop name="text">Hello World</prop>
+                <prop name="foreCol">Black</prop>
+            </properties>
+        </shape>
+    </shapes>
+</panel>
