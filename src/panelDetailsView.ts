@@ -118,9 +118,12 @@ export class PanelDetailsView implements vscode.WebviewViewProvider {
             const type = prop.type ? escapeHtml(prop.type) : '';
             const value = escapeHtml(prop.value ?? '');
 
-            const children = prop.children && prop.children.length > 0
-                ? `<div class="section">
-                     <div class="row"><span class="key">Children</span><span class="muted">(${prop.children.length})</span></div>
+            const children =
+                prop.children && prop.children.length > 0
+                    ? `<div class="section">
+                     <div class="row"><span class="key">Children</span><span class="muted">(${
+                         prop.children.length
+                     })</span></div>
                      <table>
                        ${prop.children
                            .map((c) => {
@@ -131,7 +134,7 @@ export class PanelDetailsView implements vscode.WebviewViewProvider {
                            .join('')}
                      </table>
                    </div>`
-                : '';
+                    : '';
 
             return `
 <div class="row"><span class="key">Name</span>${escapeHtml(prop.name)}</div>
@@ -147,7 +150,7 @@ ${children}
         if (item.itemType === 'script' && item.data) {
             const script = item.data as PanelScript;
             const event = escapeHtml(script.event);
-          const code = escapeHtml(script.code ?? '');
+            const code = escapeHtml(script.code ?? '');
 
             return `
 <div class="row"><span class="key">Event</span>${event}</div>

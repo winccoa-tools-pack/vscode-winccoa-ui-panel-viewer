@@ -34,7 +34,9 @@ export class VirtualCtlProvider implements vscode.TextDocumentContentProvider {
         // Query makes the URI unique per panel path without affecting the filename.
         const query = `panel=${encodeURIComponent(panelPath)}`;
         return vscode.Uri.parse(
-            `${VirtualCtlProvider.scheme}:/${encodeURIComponent(safePanel)}/${encodeURIComponent(safeEvent)}.ctl?${query}`,
+            `${VirtualCtlProvider.scheme}:/${encodeURIComponent(safePanel)}/${encodeURIComponent(
+                safeEvent,
+            )}.ctl?${query}`,
         );
     }
 }

@@ -59,10 +59,7 @@ export function registerCommands(context: vscode.ExtensionContext): void {
     // Register details pane (webview view)
     detailsViewProvider = new PanelDetailsView();
     context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(
-            PanelDetailsView.viewType,
-            detailsViewProvider,
-        ),
+        vscode.window.registerWebviewViewProvider(PanelDetailsView.viewType, detailsViewProvider),
     );
 
     // Register virtual CTL provider (so scripts open as read-only virtual .ctl docs)
@@ -183,10 +180,10 @@ async function invokeListLoadedPanelsToolCommand(): Promise<void> {
     try {
         ExtensionOutputChannel.initialize();
 
-        const result = await vscode.lm.invokeTool(
-            'winccoaPanelViewer_listLoadedPanels',
-            { toolInvocationToken: undefined, input: {} },
-        );
+        const result = await vscode.lm.invokeTool('winccoaPanelViewer_listLoadedPanels', {
+            toolInvocationToken: undefined,
+            input: {},
+        });
 
         ExtensionOutputChannel.info('LM Tools', 'Invoked tool winccoaPanelViewer_listLoadedPanels');
         ExtensionOutputChannel.info('LM Tools', formatLanguageModelToolResultForLog(result));
@@ -206,16 +203,13 @@ async function invokeGetPanelModelToolCommand(): Promise<void> {
     try {
         ExtensionOutputChannel.initialize();
 
-        const result = await vscode.lm.invokeTool(
-            'winccoaPanelViewer_getPanelModel',
-            {
-                toolInvocationToken: undefined,
-                input: {
-                    includeScripts: true,
-                    maxScriptChars: 2000,
-                },
+        const result = await vscode.lm.invokeTool('winccoaPanelViewer_getPanelModel', {
+            toolInvocationToken: undefined,
+            input: {
+                includeScripts: true,
+                maxScriptChars: 2000,
             },
-        );
+        });
 
         ExtensionOutputChannel.info('LM Tools', 'Invoked tool winccoaPanelViewer_getPanelModel');
         ExtensionOutputChannel.info('LM Tools', formatLanguageModelToolResultForLog(result));
@@ -283,9 +277,7 @@ async function checkPanelSyntaxCommand(uri?: vscode.Uri): Promise<void> {
 
         const normalizedForCompare = normalizedPath.replace(/\\/g, '/');
         if (
-            !normalizedForCompare
-                .toLocaleLowerCase()
-                .startsWith(projPanelsPath.toLocaleLowerCase())
+            !normalizedForCompare.toLocaleLowerCase().startsWith(projPanelsPath.toLocaleLowerCase())
         ) {
             void vscode.window.showErrorMessage(
                 `Selected panel is not within the current project's panels directory.\nProject panels path: ${projPanelsPath}\nPanel path: ${normalizedPath}`,
@@ -418,7 +410,11 @@ function formatLanguageModelToolResultForLog(result: vscode.LanguageModelToolRes
             if (decoded !== undefined) {
                 if (anyPart.mimeType === 'text/x-json' || anyPart.mimeType === 'application/json') {
                     try {
-                        return { kind: 'json', mimeType: anyPart.mimeType, value: JSON.parse(decoded) };
+                        return {
+                            kind: 'json',
+                            mimeType: anyPart.mimeType,
+                            value: JSON.parse(decoded),
+                        };
                     } catch {
                         return { kind: 'data', mimeType: anyPart.mimeType, value: decoded };
                     }
@@ -502,7 +498,9 @@ async function ensurePanelModelLoaded(filePath: string): Promise<boolean> {
     } catch (err) {
         ExtensionOutputChannel.warn(
             'LM Tools',
-            `Failed to load panel model for ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+            `Failed to load panel model for ${filePath}: ${
+                err instanceof Error ? err.message : String(err)
+            }`,
         );
         return false;
     }
@@ -535,7 +533,8 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                         }
 
                         const models: PanelModel[] = treeProvider?.listModels() ?? [];
-                        const activeEditorPath = vscode.window.activeTextEditor?.document?.uri?.fsPath;
+                        const activeEditorPath =
+                            vscode.window.activeTextEditor?.document?.uri?.fsPath;
 
                         const payload = {
                             count: models.length,
@@ -560,9 +559,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                         );
 
                         return new vscode.LanguageModelToolResult([
-                            new vscode.LanguageModelTextPart(
-                                JSON.stringify(payload, null, 2),
-                            ),
+                            new vscode.LanguageModelTextPart(JSON.stringify(payload, null, 2)),
                         ]);
                     } catch (err) {
                         const error = err instanceof Error ? err : new Error(String(err));
@@ -635,8 +632,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'No panel selected/loaded. Provide input.filePath or open a panel first.',
+                                        error: 'No panel selected/loaded. Provide input.filePath or open a panel first.',
                                         loadedPanels: models.map((m: PanelModel) => m.filePath),
                                     }),
                                 ),
@@ -650,8 +646,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Failed to load panel model. Ensure filePath points to a valid .pnl panel file within the current project.',
+                                        error: 'Failed to load panel model. Ensure filePath points to a valid .pnl panel file within the current project.',
                                         filePath: normalizedPath,
                                     }),
                                 ),
@@ -697,9 +692,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                         );
 
                         return new vscode.LanguageModelToolResult([
-                            new vscode.LanguageModelTextPart(
-                                JSON.stringify(sanitized, null, 2),
-                            ),
+                            new vscode.LanguageModelTextPart(JSON.stringify(sanitized, null, 2)),
                         ]);
                     } catch (err) {
                         const error = err instanceof Error ? err : new Error(String(err));
@@ -759,8 +752,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Missing input.filePath. Provide an absolute path to a .pnl or .xml panel file.',
+                                        error: 'Missing input.filePath. Provide an absolute path to a .pnl or .xml panel file.',
                                     }),
                                 ),
                             ]);
@@ -792,8 +784,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Unsupported file extension. Only .pnl and .xml are supported.',
+                                        error: 'Unsupported file extension. Only .pnl and .xml are supported.',
                                         filePath,
                                     }),
                                 ),
@@ -880,8 +871,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Missing input.filePath. Provide an absolute path to a .pnl file.',
+                                        error: 'Missing input.filePath. Provide an absolute path to a .pnl file.',
                                     }),
                                 ),
                             ]);
@@ -893,8 +883,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Unsupported file extension. Only .pnl files are supported.',
+                                        error: 'Unsupported file extension. Only .pnl files are supported.',
                                         filePath,
                                     }),
                                 ),
@@ -985,8 +974,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Missing input.filePath. Provide an absolute path to a .xml file.',
+                                        error: 'Missing input.filePath. Provide an absolute path to a .xml file.',
                                     }),
                                 ),
                             ]);
@@ -998,8 +986,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Unsupported file extension. Only .xml files are supported.',
+                                        error: 'Unsupported file extension. Only .xml files are supported.',
                                         filePath,
                                     }),
                                 ),
@@ -1090,8 +1077,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Missing input.dirPath. Provide an absolute path to a directory containing .pnl files.',
+                                        error: 'Missing input.dirPath. Provide an absolute path to a directory containing .pnl files.',
                                     }),
                                 ),
                             ]);
@@ -1203,8 +1189,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Missing input.dirPath. Provide an absolute path to a directory containing .xml files.',
+                                        error: 'Missing input.dirPath. Provide an absolute path to a directory containing .xml files.',
                                     }),
                                 ),
                             ]);
@@ -1324,8 +1309,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'No panel selected/loaded. Provide input.filePath or open a panel first.',
+                                        error: 'No panel selected/loaded. Provide input.filePath or open a panel first.',
                                         loadedPanels: models.map((m: PanelModel) => m.filePath),
                                     }),
                                 ),
@@ -1339,8 +1323,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Failed to load panel model. Ensure filePath points to a valid .pnl panel file within the current project.',
+                                        error: 'Failed to load panel model. Ensure filePath points to a valid .pnl panel file within the current project.',
                                         filePath: normalizedPath,
                                     }),
                                 ),
@@ -1498,8 +1481,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'No panel selected/loaded. Provide input.filePath or open a panel first.',
+                                        error: 'No panel selected/loaded. Provide input.filePath or open a panel first.',
                                         loadedPanels: models.map((m: PanelModel) => m.filePath),
                                     }),
                                 ),
@@ -1513,8 +1495,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'No WinCC OA project selected. Select a project in WinCC OA Project Admin first.',
+                                        error: 'No WinCC OA project selected. Select a project in WinCC OA Project Admin first.',
                                     }),
                                 ),
                             ]);
@@ -1525,8 +1506,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Cannot determine WinCC OA version from selected project; syntax check is not possible.',
+                                        error: 'Cannot determine WinCC OA version from selected project; syntax check is not possible.',
                                     }),
                                 ),
                             ]);
@@ -1545,8 +1525,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
                                     JSON.stringify({
-                                        error:
-                                            'Selected panel is not within the current project panels directory; cannot run -syntax.',
+                                        error: 'Selected panel is not within the current project panels directory; cannot run -syntax.',
                                         projectPanelsPath: projPanelsPath,
                                         filePath: normalizedPath,
                                     }),
@@ -1591,7 +1570,17 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                                 | scripts[+] [-s path]    ... check only scripts, optionally start with path
                                 | panels[+] [-p path]     ... check only panels, optionally start with path
                         */
-                        const args = ['-config', currentProject.getConfigPath(), '-syntax', 'panels+', '-p', relativePanelPath, '-n', '-log', '+stderr'];
+                        const args = [
+                            '-config',
+                            currentProject.getConfigPath(),
+                            '-syntax',
+                            'panels+',
+                            '-p',
+                            relativePanelPath,
+                            '-n',
+                            '-log',
+                            '+stderr',
+                        ];
                         const exitCode = await uiComponent.start(args, {
                             timeout: timeoutMs,
                             checkStdout: false,
