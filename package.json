@@ -266,10 +266,10 @@
         "command": "winccoaPanelViewer.openPanel",
         "title": "WinCC OA: Open Panel in Viewer"
       },
-      {
-        "command": "winccoaPanelViewer.loadAllPanels",
-        "title": "WinCC OA: Load All Panels from Project"
-      },
+        {
+          "command": "winccoaPanelViewer.loadAllPanels",
+          "title": "WinCC OA: Load All Panels from Project"
+        },
       {
         "command": "winccoaPanelViewer.clearPanels",
         "title": "WinCC OA: Clear Panel Viewer"
@@ -331,7 +331,8 @@
         {
           "id": "winccoaPanelViewer",
           "title": "WinCC OA Panel Viewer",
-          "icon": "resources/icon.png"
+          "icon": "resources/activity-monitor-gear-overlay.svg",
+          "activeIcon": "resources/activity-monitor-gear-overlay-active.svg"
         }
       ]
     },
