@@ -96,6 +96,17 @@ Ship an MVP that provides reliable panel inspection, reduces developer friction 
 
 - **AI Integration (MUST HAVE)**
   - [ ] LanguageModelToolsService integration for Copilot/AI assistants
+    - [x] `winccoaPanelViewer_listLoadedPanels` — list panels currently loaded in the Panel Viewer tree
+    - [x] `winccoaPanelViewer_getPanelModel` — return full panel model (shapes/properties/scripts) as JSON
+    - [ ] `winccoaPanelViewer_openPanelInViewer` — open a given `.pnl` in the Panel Viewer from AI
+    - [ ] `winccoaPanelViewer_checkPanelSyntax` — start WinCC OA UI with `-syntax <panel>` and evaluate panel syntax (not only CTL, but full panel including colors)
+      - First stage: treat WinCC OA UI log / stderr as text and check only for `WARNING`, `SEVERE`, `FATAL` severities to decide if something is wrong.
+      - Next stage: introduce a dedicated npm log-parser tool (separate package) to extract structured diagnostics (line, panel object, message) for both the extension and LLM tools.
+    - [ ] `winccoaPanelViewer_convertPnlToXml` — convert a single `.pnl` to XML for inspection
+    - [ ] `winccoaPanelViewer_convertXmlToPnl` — convert a single XML back to `.pnl`
+    - [ ] `winccoaPanelViewer_convertDirPnlToXml` — batch-convert a directory of `.pnl` files
+    - [ ] `winccoaPanelViewer_convertDirXmlToPnl` — batch-convert a directory of XML files
+    - [ ] `winccoaPanelViewer_summarizePanel` — return a short natural-language summary of a panel (shapes, scripts, warnings)
 
 - **Error Handling**
   - [ ] Detect and clearly report encrypted panels

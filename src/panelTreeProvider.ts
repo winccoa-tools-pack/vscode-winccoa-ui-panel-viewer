@@ -155,6 +155,20 @@ export class PanelTreeProvider implements vscode.TreeDataProvider<PanelTreeItem>
         return this.models.has(filePath);
     }
 
+    /**
+     * Returns all loaded panel models.
+     */
+    public listModels(): PanelModel[] {
+        return Array.from(this.models.values());
+    }
+
+    /**
+     * Returns the model for a specific panel path, if loaded.
+     */
+    public getModel(filePath: string): PanelModel | undefined {
+        return this.models.get(filePath);
+    }
+
     getTreeItem(element: PanelTreeItem): vscode.TreeItem {
         return element;
     }

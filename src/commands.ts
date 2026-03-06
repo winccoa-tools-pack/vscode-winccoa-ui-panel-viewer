@@ -18,12 +18,12 @@ import {
 import { PanelTreeProvider } from './panelTreeProvider';
 import { parsePanelXml } from './panelParser';
 import { createEncryptedPanelModel } from './panelModel';
-import { PanelScript } from './panelModel';
+import { PanelScript, PanelModel } from './panelModel';
 import { PanelDetailsView } from './panelDetailsView';
 import { VirtualCtlProvider } from './virtualCtlProvider';
 import { UIComponent } from '@winccoa-tools-pack/npm-winccoa-core/types/components/implementations/index';
 import { getSelectedProject } from './otherExtensions';
-import { CORE_EXTENSION_ID } from './const';
+import { CORE_EXTENSION_ID, EXTENSION_NAME } from './const';
 import { ProjEnvProjectFileSysStruct } from '@winccoa-tools-pack/npm-winccoa-core';
 
 /** Singleton tree provider instance */
@@ -113,14 +113,1574 @@ export function registerCommands(context: vscode.ExtensionContext): void {
             previewPanelWithOptionsCommand,
         ),
 
+        // Syntax check (WCCOAui -syntax)
+        vscode.commands.registerCommand(
+            'winccoaPanelViewer.checkPanelSyntax',
+            checkPanelSyntaxCommand,
+        ),
+
         // Show script in editor
         vscode.commands.registerCommand('winccoaPanelViewer.showScript', showScriptCommand),
+
+        // Smoke test: dump language model tools visible to extensions
+        vscode.commands.registerCommand(
+            'winccoaPanelViewer.dumpLanguageModelTools',
+            dumpLanguageModelToolsCommand,
+        ),
+
+        vscode.commands.registerCommand(
+            'winccoaPanelViewer.invokeListLoadedPanelsTool',
+            invokeListLoadedPanelsToolCommand,
+        ),
+
+        vscode.commands.registerCommand(
+            'winccoaPanelViewer.invokeGetPanelModelTool',
+            invokeGetPanelModelToolCommand,
+        ),
     );
 
     // Setup file watcher for .pnl changes
     setupFileWatcher(context);
 
+    // Register Language Model tools for Copilot/AI assistants
+    registerLanguageModelTools(context);
+
     ExtensionOutputChannel.info('Commands', 'Panel viewer commands registered');
+}
+
+async function dumpLanguageModelToolsCommand(): Promise<void> {
+    try {
+        ExtensionOutputChannel.initialize();
+
+        const tools = vscode.lm?.tools ?? [];
+        const winccoaTools = tools.filter((t) => t.name.startsWith('winccoaPanelViewer_'));
+
+        const payload = {
+            totalCount: tools.length,
+            winccoaCount: winccoaTools.length,
+            winccoaTools: winccoaTools.map((t) => ({
+                name: t.name,
+                description: t.description,
+                tags: t.tags,
+                inputSchema: t.inputSchema,
+            })),
+        };
+
+        ExtensionOutputChannel.info(
+            'LM Tools',
+            `Visible tools: ${tools.length}. WinCC OA tools: ${winccoaTools.length}.`,
+        );
+        ExtensionOutputChannel.info('LM Tools', JSON.stringify(payload, null, 2));
+        ExtensionOutputChannel.instance.show(true);
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error('LM Tools', 'Failed to dump language model tools', error);
+        void vscode.window.showErrorMessage('Failed to dump language model tools. See Output.');
+    }
+}
+
+async function invokeListLoadedPanelsToolCommand(): Promise<void> {
+    try {
+        ExtensionOutputChannel.initialize();
+
+        const result = await vscode.lm.invokeTool(
+            'winccoaPanelViewer_listLoadedPanels',
+            { toolInvocationToken: undefined, input: {} },
+        );
+
+        ExtensionOutputChannel.info('LM Tools', 'Invoked tool winccoaPanelViewer_listLoadedPanels');
+        ExtensionOutputChannel.info('LM Tools', formatLanguageModelToolResultForLog(result));
+        ExtensionOutputChannel.instance.show(true);
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to invoke tool winccoaPanelViewer_listLoadedPanels',
+            error,
+        );
+        void vscode.window.showErrorMessage('Failed to invoke LM tool. See Output.');
+    }
+}
+
+async function invokeGetPanelModelToolCommand(): Promise<void> {
+    try {
+        ExtensionOutputChannel.initialize();
+
+        const result = await vscode.lm.invokeTool(
+            'winccoaPanelViewer_getPanelModel',
+            {
+                toolInvocationToken: undefined,
+                input: {
+                    includeScripts: true,
+                    maxScriptChars: 2000,
+                },
+            },
+        );
+
+        ExtensionOutputChannel.info('LM Tools', 'Invoked tool winccoaPanelViewer_getPanelModel');
+        ExtensionOutputChannel.info('LM Tools', formatLanguageModelToolResultForLog(result));
+        ExtensionOutputChannel.instance.show(true);
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to invoke tool winccoaPanelViewer_getPanelModel',
+            error,
+        );
+        void vscode.window.showErrorMessage('Failed to invoke LM tool. See Output.');
+    }
+}
+
+async function checkPanelSyntaxCommand(uri?: vscode.Uri): Promise<void> {
+    try {
+        ExtensionOutputChannel.initialize();
+
+        let filePath: string | undefined;
+
+        if (uri) {
+            filePath = uri.fsPath;
+        } else if (currentPanelPath) {
+            filePath = currentPanelPath;
+        } else if (vscode.window.activeTextEditor?.document?.uri?.fsPath) {
+            filePath = vscode.window.activeTextEditor.document.uri.fsPath;
+        }
+
+        if (!filePath) {
+            const picked = await vscode.window.showOpenDialog({
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                filters: { 'WinCC OA Panels': ['pnl'] },
+                title: 'Select Panel File to Check Syntax',
+            });
+            if (!picked || picked.length === 0) {
+                return;
+            }
+            filePath = picked[0].fsPath;
+        }
+
+        const normalizedPath = filePath.replace(/\\/g, path.sep);
+
+        const currentProject = getSelectedProject();
+        if (!currentProject) {
+            void vscode.window.showErrorMessage(
+                'No WinCC OA project selected. Select a project in WinCC OA Project Admin first.',
+            );
+            return;
+        }
+
+        const version = currentProject.getVersion();
+        if (!version) {
+            void vscode.window.showErrorMessage(
+                'Cannot determine WinCC OA version from selected project; syntax check is not possible.',
+            );
+            return;
+        }
+
+        const projPanelsPath = currentProject
+            .getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH)
+            .replace(/\\/g, '/');
+
+        const normalizedForCompare = normalizedPath.replace(/\\/g, '/');
+        if (
+            !normalizedForCompare
+                .toLocaleLowerCase()
+                .startsWith(projPanelsPath.toLocaleLowerCase())
+        ) {
+            void vscode.window.showErrorMessage(
+                `Selected panel is not within the current project's panels directory.\nProject panels path: ${projPanelsPath}\nPanel path: ${normalizedPath}`,
+            );
+            return;
+        }
+
+        const relativePanelPath = normalizedForCompare.substring(projPanelsPath.length);
+
+        const uiComponent = new UIComponent();
+        uiComponent.setVersion(version);
+
+        if (!uiComponent.exists()) {
+            void vscode.window.showErrorMessage(
+                `WinCC OA UI executable not found for version ${version}.`,
+            );
+            return;
+        }
+
+        const timeoutMs = 60000;
+        const severities = ['WARNING', 'SEVERE', 'FATAL'];
+
+        ExtensionOutputChannel.info(
+            'Syntax',
+            `Running WCCOAui -syntax for panel ${relativePanelPath} (version=${version})`,
+        );
+
+        const args = [
+            '-config',
+            currentProject.getConfigPath(),
+            '-syntax',
+            'panels+',
+            '-p',
+            relativePanelPath,
+            '-n',
+            '-log',
+            '+stderr',
+        ];
+
+        const exitCode = await uiComponent.start(args, {
+            timeout: timeoutMs,
+            checkStdout: false,
+        });
+
+        const stderr = uiComponent.stdErr ?? '';
+        const stdout = uiComponent.stdOut ?? '';
+
+        const issueLines: { severity: string; message: string }[] = [];
+        const upperSeverities = severities.map((s) => s.toUpperCase());
+
+        for (const rawLine of stderr.split(/\r?\n/)) {
+            const line = rawLine.trim();
+            if (!line) continue;
+            const upperLine = line.toUpperCase();
+            const matchedSeverity = upperSeverities.find((s) => upperLine.includes(s));
+            if (matchedSeverity) {
+                issueLines.push({ severity: matchedSeverity, message: line });
+            }
+        }
+
+        const ok = exitCode === 0 && issueLines.length === 0;
+
+        if (ok) {
+            ExtensionOutputChannel.info(
+                'Syntax',
+                `Panel syntax OK for ${relativePanelPath} (no WARNING/SEVERE/FATAL). Exit code=${exitCode}.`,
+            );
+            ExtensionOutputChannel.instance.show(true);
+            void vscode.window.showInformationMessage(
+                `Panel syntax OK for ${path.basename(normalizedPath)}.`,
+            );
+            return;
+        }
+
+        ExtensionOutputChannel.warn(
+            'Syntax',
+            `Panel syntax check found ${issueLines.length} issue(s) for ${relativePanelPath}. Exit code=${exitCode}.`,
+        );
+        for (const issue of issueLines) {
+            ExtensionOutputChannel.warn('Syntax', `${issue.severity}: ${issue.message}`);
+        }
+
+        if (stderr.trim()) {
+            ExtensionOutputChannel.warn('Syntax', '--- stderr ---');
+            ExtensionOutputChannel.warn('Syntax', stderr);
+        }
+        if (stdout.trim()) {
+            ExtensionOutputChannel.info('Syntax', '--- stdout ---');
+            ExtensionOutputChannel.info('Syntax', stdout);
+        }
+
+        ExtensionOutputChannel.instance.show(true);
+        void vscode.window.showWarningMessage(
+            `Panel syntax check found ${issueLines.length} issue(s) for ${path.basename(
+                normalizedPath,
+            )}. See "${EXTENSION_NAME}" output for details.`,
+        );
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error('Syntax', 'Failed to run panel syntax check', error);
+        ExtensionOutputChannel.instance.show(true);
+        void vscode.window.showErrorMessage(
+            'Failed to run panel syntax check. See Output for details.',
+        );
+    }
+}
+
+function formatLanguageModelToolResultForLog(result: vscode.LanguageModelToolResult): string {
+    // LanguageModelToolResult is conceptually "parts", but the concrete shape in
+    // JS can include wrapper objects (e.g. `{ content: [...] }`).
+    // When tools return `LanguageModelDataPart.json(...)`, VS Code transports
+    // JSON as bytes. `JSON.stringify(result)` therefore shows a Buffer/Uint8Array wrapper.
+    const flattenedParts = flattenLanguageModelResultParts(result);
+
+    const decodedParts = flattenedParts.map((part) => {
+        const anyPart = part as unknown as {
+            mimeType?: string;
+            data?: unknown;
+            value?: unknown;
+            content?: unknown;
+        };
+
+        // Text parts usually have a `value` field.
+        if (typeof anyPart.value === 'string') {
+            return { kind: 'text', value: anyPart.value };
+        }
+
+        if (typeof anyPart.mimeType === 'string') {
+            const decoded = decodeLanguageModelDataPart(anyPart.data);
+            if (decoded !== undefined) {
+                if (anyPart.mimeType === 'text/x-json' || anyPart.mimeType === 'application/json') {
+                    try {
+                        return { kind: 'json', mimeType: anyPart.mimeType, value: JSON.parse(decoded) };
+                    } catch {
+                        return { kind: 'data', mimeType: anyPart.mimeType, value: decoded };
+                    }
+                }
+                return { kind: 'data', mimeType: anyPart.mimeType, value: decoded };
+            }
+            return { kind: 'data', mimeType: anyPart.mimeType, value: anyPart.data };
+        }
+
+        return { kind: 'unknown', value: part };
+    });
+
+    return JSON.stringify(decodedParts, null, 2);
+}
+
+function flattenLanguageModelResultParts(value: unknown): unknown[] {
+    if (Array.isArray(value)) {
+        return value.flatMap((v) => flattenLanguageModelResultParts(v));
+    }
+
+    if (value && typeof value === 'object') {
+        // Some VS Code internals wrap results as `{ content: [...] }`.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const maybeContent = (value as any).content;
+        if (Array.isArray(maybeContent)) {
+            return flattenLanguageModelResultParts(maybeContent);
+        }
+    }
+
+    return [value];
+}
+
+function decodeLanguageModelDataPart(data: unknown): string | undefined {
+    if (data === undefined || data === null) {
+        return undefined;
+    }
+
+    if (typeof data === 'string') {
+        return data;
+    }
+
+    // Node.js Buffer
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (typeof Buffer !== 'undefined' && Buffer.isBuffer(data as any)) {
+        return (data as Buffer).toString('utf8');
+    }
+
+    // Uint8Array
+    if (data instanceof Uint8Array) {
+        return new TextDecoder('utf-8').decode(data);
+    }
+
+    // JSON-serialized buffer: { type: 'Buffer', data: number[] }
+    if (
+        typeof data === 'object' &&
+        data !== null &&
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (data as any).type === 'Buffer' &&
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Array.isArray((data as any).data)
+    ) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const bytes = (data as any).data as number[];
+        return Buffer.from(bytes).toString('utf8');
+    }
+
+    return undefined;
+}
+
+async function ensurePanelModelLoaded(filePath: string): Promise<boolean> {
+    if (!treeProvider) {
+        return false;
+    }
+
+    if (treeProvider.hasModel(filePath)) {
+        return true;
+    }
+
+    try {
+        await loadPanelIntoViewerSilent(filePath);
+    } catch (err) {
+        ExtensionOutputChannel.warn(
+            'LM Tools',
+            `Failed to load panel model for ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return false;
+    }
+
+    return treeProvider.hasModel(filePath);
+}
+
+function registerLanguageModelTools(context: vscode.ExtensionContext): void {
+    try {
+        context.subscriptions.push(
+            vscode.lm.registerTool('winccoaPanelViewer_listLoadedPanels', {
+                prepareInvocation: () => ({
+                    invocationMessage: 'Listing loaded WinCC OA panels…',
+                }),
+                invoke: async (_options, token) => {
+                    const startedAt = Date.now();
+                    try {
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            'Tool invoked: winccoaPanelViewer_listLoadedPanels',
+                        );
+                        ExtensionOutputChannel.instance?.show(true);
+
+                        if (token?.isCancellationRequested) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({ cancelled: true, count: 0, panels: [] }),
+                                ),
+                            ]);
+                        }
+
+                        const models: PanelModel[] = treeProvider?.listModels() ?? [];
+                        const activeEditorPath = vscode.window.activeTextEditor?.document?.uri?.fsPath;
+
+                        const payload = {
+                            count: models.length,
+                            panels: models.map((m: PanelModel) => ({
+                                filePath: m.filePath,
+                                name: m.name,
+                                encrypted: m.encrypted,
+                            })),
+                            context: models.length
+                                ? undefined
+                                : {
+                                      hint: 'No panels are currently loaded in the Panel Viewer tree in this VS Code window. Use "WinCC OA: Open Panel in Viewer" or "WinCC OA: Load All Panels from Project" first.',
+                                      currentPanelPath,
+                                      activeEditorPath,
+                                  },
+                        };
+
+                        const elapsedMs = Date.now() - startedAt;
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            `Tool finished: winccoaPanelViewer_listLoadedPanels (count=${models.length}, ${elapsedMs}ms)`,
+                        );
+
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify(payload, null, 2),
+                            ),
+                        ]);
+                    } catch (err) {
+                        const error = err instanceof Error ? err : new Error(String(err));
+                        ExtensionOutputChannel.error(
+                            'LM Tools',
+                            'Tool failed: winccoaPanelViewer_listLoadedPanels',
+                            error,
+                        );
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify({ error: error.message, count: 0, panels: [] }),
+                            ),
+                        ]);
+                    }
+                },
+            }),
+        );
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to register tool winccoaPanelViewer_listLoadedPanels',
+            error,
+        );
+    }
+
+    try {
+        context.subscriptions.push(
+            vscode.lm.registerTool('winccoaPanelViewer_getPanelModel', {
+                prepareInvocation: () => ({
+                    invocationMessage: 'Reading WinCC OA panel model…',
+                }),
+                invoke: async (options, token) => {
+                    const startedAt = Date.now();
+                    try {
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            'Tool invoked: winccoaPanelViewer_getPanelModel',
+                        );
+                        ExtensionOutputChannel.instance?.show(true);
+
+                        if (token?.isCancellationRequested) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({ cancelled: true }),
+                                ),
+                            ]);
+                        }
+
+                        const input = (options?.input ?? {}) as {
+                            filePath?: string;
+                            includeScripts?: boolean;
+                            maxScriptChars?: number;
+                        };
+
+                        const models: PanelModel[] = treeProvider?.listModels() ?? [];
+                        const includeScripts = input.includeScripts ?? true;
+                        const maxScriptChars =
+                            typeof input.maxScriptChars === 'number' ? input.maxScriptChars : 8000;
+
+                        let filePath = input.filePath;
+                        if (!filePath) {
+                            filePath = currentPanelPath;
+                        }
+                        if (!filePath && models.length === 1) {
+                            filePath = models[0].filePath;
+                        }
+
+                        if (!filePath) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'No panel selected/loaded. Provide input.filePath or open a panel first.',
+                                        loadedPanels: models.map((m: PanelModel) => m.filePath),
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const normalizedPath = filePath.replace(/\\/g, path.sep);
+
+                        const loaded = await ensurePanelModelLoaded(normalizedPath);
+                        if (!loaded) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Failed to load panel model. Ensure filePath points to a valid .pnl panel file within the current project.',
+                                        filePath: normalizedPath,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const model = treeProvider?.getModel(normalizedPath);
+                        if (!model) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error: `Panel is not loaded: ${normalizedPath}`,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const sanitized = {
+                            filePath: model.filePath,
+                            name: model.name,
+                            encrypted: model.encrypted,
+                            shapes: model.shapes,
+                            properties: model.properties,
+                            references: model.references,
+                            errors: model.errors,
+                            scripts: includeScripts
+                                ? model.scripts.map((s) => ({
+                                      ...s,
+                                      code:
+                                          typeof s.code === 'string' &&
+                                          s.code.length > maxScriptChars
+                                              ? s.code.slice(0, Math.max(0, maxScriptChars)) +
+                                                '\n/* ...truncated... */'
+                                              : s.code,
+                                  }))
+                                : [],
+                        };
+
+                        const elapsedMs = Date.now() - startedAt;
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            `Tool finished: winccoaPanelViewer_getPanelModel (${elapsedMs}ms)`,
+                        );
+
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify(sanitized, null, 2),
+                            ),
+                        ]);
+                    } catch (err) {
+                        const error = err instanceof Error ? err : new Error(String(err));
+                        ExtensionOutputChannel.error(
+                            'LM Tools',
+                            'Tool failed: winccoaPanelViewer_getPanelModel',
+                            error,
+                        );
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify({ error: error.message }),
+                            ),
+                        ]);
+                    }
+                },
+            }),
+        );
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to register tool winccoaPanelViewer_getPanelModel',
+            error,
+        );
+    }
+
+    try {
+        context.subscriptions.push(
+            vscode.lm.registerTool('winccoaPanelViewer_openPanelInViewer', {
+                prepareInvocation: () => ({
+                    invocationMessage: 'Opening WinCC OA panel in UI viewer…',
+                }),
+                invoke: async (options, token) => {
+                    const startedAt = Date.now();
+                    try {
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            'Tool invoked: winccoaPanelViewer_openPanelInViewer',
+                        );
+                        ExtensionOutputChannel.instance?.show(true);
+
+                        if (token?.isCancellationRequested) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({ cancelled: true }),
+                                ),
+                            ]);
+                        }
+
+                        const input = (options?.input ?? {}) as {
+                            filePath?: string;
+                            uiArgs?: string[];
+                        };
+
+                        const rawPath = input.filePath;
+                        if (!rawPath) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Missing input.filePath. Provide an absolute path to a .pnl or .xml panel file.',
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const filePath = rawPath.replace(/\\/g, path.sep);
+                        const ext = path.extname(filePath).toLowerCase();
+
+                        let previewPath = filePath;
+                        let converted = false;
+
+                        if (ext === '.xml') {
+                            const conv = await convertXmlToPnl(filePath);
+                            if (!conv.success || !conv.outputPath) {
+                                return new vscode.LanguageModelToolResult([
+                                    new vscode.LanguageModelTextPart(
+                                        JSON.stringify({
+                                            error:
+                                                conv.error ||
+                                                'Failed to convert XML to panel before preview.',
+                                            filePath,
+                                        }),
+                                    ),
+                                ]);
+                            }
+                            previewPath = conv.outputPath;
+                            converted = true;
+                        } else if (ext !== '.pnl') {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Unsupported file extension. Only .pnl and .xml are supported.',
+                                        filePath,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        await previewPanelCommand(vscode.Uri.file(previewPath));
+
+                        const elapsedMs = Date.now() - startedAt;
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            `Tool finished: winccoaPanelViewer_openPanelInViewer (${elapsedMs}ms)`,
+                        );
+
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify(
+                                    {
+                                        ok: true,
+                                        filePath,
+                                        previewPath,
+                                        convertedFromXml: converted,
+                                    },
+                                    null,
+                                    2,
+                                ),
+                            ),
+                        ]);
+                    } catch (err) {
+                        const error = err instanceof Error ? err : new Error(String(err));
+                        ExtensionOutputChannel.error(
+                            'LM Tools',
+                            'Tool failed: winccoaPanelViewer_openPanelInViewer',
+                            error,
+                        );
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify({ error: error.message }),
+                            ),
+                        ]);
+                    }
+                },
+            }),
+        );
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to register tool winccoaPanelViewer_openPanelInViewer',
+            error,
+        );
+    }
+
+    try {
+        context.subscriptions.push(
+            vscode.lm.registerTool('winccoaPanelViewer_convertPnlToXml', {
+                prepareInvocation: () => ({
+                    invocationMessage: 'Converting WinCC OA panel (.pnl) to XML…',
+                }),
+                invoke: async (options, token) => {
+                    const startedAt = Date.now();
+                    try {
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            'Tool invoked: winccoaPanelViewer_convertPnlToXml',
+                        );
+                        ExtensionOutputChannel.instance?.show(true);
+
+                        if (token?.isCancellationRequested) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({ cancelled: true }),
+                                ),
+                            ]);
+                        }
+
+                        const input = (options?.input ?? {}) as {
+                            filePath?: string;
+                            outputDir?: string;
+                        };
+
+                        const rawPath = input.filePath;
+                        if (!rawPath) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Missing input.filePath. Provide an absolute path to a .pnl file.',
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const filePath = rawPath.replace(/\\/g, path.sep);
+                        const ext = path.extname(filePath).toLowerCase();
+                        if (ext && ext !== '.pnl') {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Unsupported file extension. Only .pnl files are supported.',
+                                        filePath,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const outputDir = input.outputDir
+                            ? input.outputDir.replace(/\\/g, path.sep)
+                            : path.dirname(filePath);
+
+                        const result = await convertPnlToXml(filePath, outputDir);
+
+                        const elapsedMs = Date.now() - startedAt;
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            `Tool finished: winccoaPanelViewer_convertPnlToXml (success=${result.success}, ${elapsedMs}ms)`,
+                        );
+
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify(
+                                    {
+                                        ok: result.success,
+                                        filePath,
+                                        xmlPath: result.outputPath,
+                                        error: result.success ? undefined : result.error,
+                                    },
+                                    null,
+                                    2,
+                                ),
+                            ),
+                        ]);
+                    } catch (err) {
+                        const error = err instanceof Error ? err : new Error(String(err));
+                        ExtensionOutputChannel.error(
+                            'LM Tools',
+                            'Tool failed: winccoaPanelViewer_convertPnlToXml',
+                            error,
+                        );
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify({ error: error.message }),
+                            ),
+                        ]);
+                    }
+                },
+            }),
+        );
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to register tool winccoaPanelViewer_convertPnlToXml',
+            error,
+        );
+    }
+
+    try {
+        context.subscriptions.push(
+            vscode.lm.registerTool('winccoaPanelViewer_convertXmlToPnl', {
+                prepareInvocation: () => ({
+                    invocationMessage: 'Converting WinCC OA XML panel (.xml) to .pnl…',
+                }),
+                invoke: async (options, token) => {
+                    const startedAt = Date.now();
+                    try {
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            'Tool invoked: winccoaPanelViewer_convertXmlToPnl',
+                        );
+                        ExtensionOutputChannel.instance?.show(true);
+
+                        if (token?.isCancellationRequested) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({ cancelled: true }),
+                                ),
+                            ]);
+                        }
+
+                        const input = (options?.input ?? {}) as {
+                            filePath?: string;
+                            outputDir?: string;
+                        };
+
+                        const rawPath = input.filePath;
+                        if (!rawPath) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Missing input.filePath. Provide an absolute path to a .xml file.',
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const filePath = rawPath.replace(/\\/g, path.sep);
+                        const ext = path.extname(filePath).toLowerCase();
+                        if (ext && ext !== '.xml') {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Unsupported file extension. Only .xml files are supported.',
+                                        filePath,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const outputDir = input.outputDir
+                            ? input.outputDir.replace(/\\/g, path.sep)
+                            : path.dirname(filePath);
+
+                        const result = await convertXmlToPnl(filePath, outputDir);
+
+                        const elapsedMs = Date.now() - startedAt;
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            `Tool finished: winccoaPanelViewer_convertXmlToPnl (success=${result.success}, ${elapsedMs}ms)`,
+                        );
+
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify(
+                                    {
+                                        ok: result.success,
+                                        filePath,
+                                        pnlPath: result.outputPath,
+                                        error: result.success ? undefined : result.error,
+                                    },
+                                    null,
+                                    2,
+                                ),
+                            ),
+                        ]);
+                    } catch (err) {
+                        const error = err instanceof Error ? err : new Error(String(err));
+                        ExtensionOutputChannel.error(
+                            'LM Tools',
+                            'Tool failed: winccoaPanelViewer_convertXmlToPnl',
+                            error,
+                        );
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify({ error: error.message }),
+                            ),
+                        ]);
+                    }
+                },
+            }),
+        );
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to register tool winccoaPanelViewer_convertXmlToPnl',
+            error,
+        );
+    }
+
+    try {
+        context.subscriptions.push(
+            vscode.lm.registerTool('winccoaPanelViewer_convertDirPnlToXml', {
+                prepareInvocation: () => ({
+                    invocationMessage:
+                        'Recursively converting all WinCC OA panels (.pnl) in a directory to XML…',
+                }),
+                invoke: async (options, token) => {
+                    const startedAt = Date.now();
+                    try {
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            'Tool invoked: winccoaPanelViewer_convertDirPnlToXml',
+                        );
+                        ExtensionOutputChannel.instance?.show(true);
+
+                        if (token?.isCancellationRequested) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({ cancelled: true }),
+                                ),
+                            ]);
+                        }
+
+                        const input = (options?.input ?? {}) as {
+                            dirPath?: string;
+                        };
+
+                        const rawDir = input.dirPath;
+                        if (!rawDir) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Missing input.dirPath. Provide an absolute path to a directory containing .pnl files.',
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const dirPath = rawDir.replace(/\\/g, path.sep);
+                        if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error: 'Directory does not exist or is not a directory.',
+                                        dirPath,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const progress: vscode.Progress<{
+                            message?: string;
+                            increment?: number;
+                        }> = {
+                            report: (value) => {
+                                if (value.message) {
+                                    ExtensionOutputChannel.debug(
+                                        'LM Tools',
+                                        `convertDirPnlToXml: ${value.message}`,
+                                    );
+                                }
+                            },
+                        };
+
+                        const result = await convertDirectoryPnlToXml(dirPath, progress);
+
+                        const elapsedMs = Date.now() - startedAt;
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            `Tool finished: winccoaPanelViewer_convertDirPnlToXml (converted=${result.converted}, failed=${result.failed}, ${elapsedMs}ms)`,
+                        );
+
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify(
+                                    {
+                                        dirPath,
+                                        converted: result.converted,
+                                        failed: result.failed,
+                                        errors: result.errors,
+                                    },
+                                    null,
+                                    2,
+                                ),
+                            ),
+                        ]);
+                    } catch (err) {
+                        const error = err instanceof Error ? err : new Error(String(err));
+                        ExtensionOutputChannel.error(
+                            'LM Tools',
+                            'Tool failed: winccoaPanelViewer_convertDirPnlToXml',
+                            error,
+                        );
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify({ error: error.message }),
+                            ),
+                        ]);
+                    }
+                },
+            }),
+        );
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to register tool winccoaPanelViewer_convertDirPnlToXml',
+            error,
+        );
+    }
+
+    try {
+        context.subscriptions.push(
+            vscode.lm.registerTool('winccoaPanelViewer_convertDirXmlToPnl', {
+                prepareInvocation: () => ({
+                    invocationMessage:
+                        'Recursively converting all WinCC OA XML panels (.xml) in a directory to .pnl…',
+                }),
+                invoke: async (options, token) => {
+                    const startedAt = Date.now();
+                    try {
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            'Tool invoked: winccoaPanelViewer_convertDirXmlToPnl',
+                        );
+                        ExtensionOutputChannel.instance?.show(true);
+
+                        if (token?.isCancellationRequested) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({ cancelled: true }),
+                                ),
+                            ]);
+                        }
+
+                        const input = (options?.input ?? {}) as {
+                            dirPath?: string;
+                        };
+
+                        const rawDir = input.dirPath;
+                        if (!rawDir) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Missing input.dirPath. Provide an absolute path to a directory containing .xml files.',
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const dirPath = rawDir.replace(/\\/g, path.sep);
+                        if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error: 'Directory does not exist or is not a directory.',
+                                        dirPath,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const progress: vscode.Progress<{
+                            message?: string;
+                            increment?: number;
+                        }> = {
+                            report: (value) => {
+                                if (value.message) {
+                                    ExtensionOutputChannel.debug(
+                                        'LM Tools',
+                                        `convertDirXmlToPnl: ${value.message}`,
+                                    );
+                                }
+                            },
+                        };
+
+                        const result = await convertDirectoryXmlToPnl(dirPath, progress);
+
+                        const elapsedMs = Date.now() - startedAt;
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            `Tool finished: winccoaPanelViewer_convertDirXmlToPnl (converted=${result.converted}, failed=${result.failed}, ${elapsedMs}ms)`,
+                        );
+
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify(
+                                    {
+                                        dirPath,
+                                        converted: result.converted,
+                                        failed: result.failed,
+                                        errors: result.errors,
+                                    },
+                                    null,
+                                    2,
+                                ),
+                            ),
+                        ]);
+                    } catch (err) {
+                        const error = err instanceof Error ? err : new Error(String(err));
+                        ExtensionOutputChannel.error(
+                            'LM Tools',
+                            'Tool failed: winccoaPanelViewer_convertDirXmlToPnl',
+                            error,
+                        );
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify({ error: error.message }),
+                            ),
+                        ]);
+                    }
+                },
+            }),
+        );
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to register tool winccoaPanelViewer_convertDirXmlToPnl',
+            error,
+        );
+    }
+
+    try {
+        context.subscriptions.push(
+            vscode.lm.registerTool('winccoaPanelViewer_summarizePanel', {
+                prepareInvocation: () => ({
+                    invocationMessage: 'Summarizing WinCC OA panel structure…',
+                }),
+                invoke: async (options, token) => {
+                    const startedAt = Date.now();
+                    try {
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            'Tool invoked: winccoaPanelViewer_summarizePanel',
+                        );
+                        ExtensionOutputChannel.instance?.show(true);
+
+                        if (token?.isCancellationRequested) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({ cancelled: true }),
+                                ),
+                            ]);
+                        }
+
+                        const input = (options?.input ?? {}) as {
+                            filePath?: string;
+                        };
+
+                        const models: PanelModel[] = treeProvider?.listModels() ?? [];
+
+                        let filePath = input.filePath;
+                        if (!filePath) {
+                            filePath = currentPanelPath;
+                        }
+                        if (!filePath && models.length === 1) {
+                            filePath = models[0].filePath;
+                        }
+
+                        if (!filePath) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'No panel selected/loaded. Provide input.filePath or open a panel first.',
+                                        loadedPanels: models.map((m: PanelModel) => m.filePath),
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const normalizedPath = filePath.replace(/\\/g, path.sep);
+
+                        const loaded = await ensurePanelModelLoaded(normalizedPath);
+                        if (!loaded) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Failed to load panel model. Ensure filePath points to a valid .pnl panel file within the current project.',
+                                        filePath: normalizedPath,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const model = treeProvider?.getModel(normalizedPath);
+                        if (!model) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error: `Panel is not loaded: ${normalizedPath}`,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const shapeCount = model.shapes.length;
+                        const scriptCount = model.scripts.length;
+                        const errorCount = model.errors?.length ?? 0;
+
+                        const shapesByType: Record<string, number> = {};
+                        for (const shape of model.shapes) {
+                            const typeKey = (shape.shapeType ?? 'unknown').toString();
+                            shapesByType[typeKey] = (shapesByType[typeKey] ?? 0) + 1;
+                        }
+
+                        const scriptsByEvent: Record<string, number> = {};
+                        for (const script of model.scripts) {
+                            const eventKey = (script.event ?? 'unknown').toString();
+                            scriptsByEvent[eventKey] = (scriptsByEvent[eventKey] ?? 0) + 1;
+                        }
+
+                        const mainShapeTypes = Object.entries(shapesByType)
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 5)
+                            .map(([type, count]) => `${count} ${type}`)
+                            .join(', ');
+
+                        const mainEvents = Object.entries(scriptsByEvent)
+                            .sort((a, b) => b[1] - a[1])
+                            .slice(0, 5)
+                            .map(([event, count]) => `${count} ${event}`)
+                            .join(', ');
+
+                        let summary = `Panel "${model.name}" has ${shapeCount} shapes and ${scriptCount} scripts.`;
+                        if (mainShapeTypes) {
+                            summary += ` Main shape types: ${mainShapeTypes}.`;
+                        }
+                        if (mainEvents) {
+                            summary += ` Main script events: ${mainEvents}.`;
+                        }
+                        if (model.encrypted) {
+                            summary +=
+                                ' Panel appears to be encrypted; detailed structure may not be available.';
+                        }
+                        if (errorCount > 0) {
+                            summary += ` There are ${errorCount} parser/validation errors.`;
+                        }
+
+                        const elapsedMs = Date.now() - startedAt;
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            `Tool finished: winccoaPanelViewer_summarizePanel (${elapsedMs}ms)`,
+                        );
+
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify(
+                                    {
+                                        filePath: model.filePath,
+                                        name: model.name,
+                                        encrypted: model.encrypted,
+                                        summary,
+                                        stats: {
+                                            shapeCount,
+                                            scriptCount,
+                                            errorCount,
+                                            shapesByType,
+                                            scriptsByEvent,
+                                        },
+                                    },
+                                    null,
+                                    2,
+                                ),
+                            ),
+                        ]);
+                    } catch (err) {
+                        const error = err instanceof Error ? err : new Error(String(err));
+                        ExtensionOutputChannel.error(
+                            'LM Tools',
+                            'Tool failed: winccoaPanelViewer_summarizePanel',
+                            error,
+                        );
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify({ error: error.message }),
+                            ),
+                        ]);
+                    }
+                },
+            }),
+        );
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to register tool winccoaPanelViewer_summarizePanel',
+            error,
+        );
+    }
+
+    try {
+        context.subscriptions.push(
+            vscode.lm.registerTool('winccoaPanelViewer_checkPanelSyntax', {
+                prepareInvocation: () => ({
+                    invocationMessage:
+                        'Checking WinCC OA panel syntax via WCCOAui -syntax (logs: WARNING/SEVERE/FATAL)…',
+                }),
+                invoke: async (options, token) => {
+                    const startedAt = Date.now();
+                    try {
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            'Tool invoked: winccoaPanelViewer_checkPanelSyntax',
+                        );
+                        ExtensionOutputChannel.instance?.show(true);
+
+                        if (token?.isCancellationRequested) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({ cancelled: true }),
+                                ),
+                            ]);
+                        }
+
+                        const input = (options?.input ?? {}) as {
+                            filePath?: string;
+                            severities?: string[];
+                            timeoutMs?: number;
+                            maxLogChars?: number;
+                        };
+
+                        const models: PanelModel[] = treeProvider?.listModels() ?? [];
+
+                        let filePath = input.filePath;
+                        if (!filePath) {
+                            filePath = currentPanelPath;
+                        }
+                        if (!filePath && models.length === 1) {
+                            filePath = models[0].filePath;
+                        }
+
+                        if (!filePath) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'No panel selected/loaded. Provide input.filePath or open a panel first.',
+                                        loadedPanels: models.map((m: PanelModel) => m.filePath),
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const normalizedPath = filePath.replace(/\\/g, path.sep);
+
+                        const currentProject = getSelectedProject();
+                        if (!currentProject) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'No WinCC OA project selected. Select a project in WinCC OA Project Admin first.',
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const version = currentProject.getVersion();
+                        if (!version) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Cannot determine WinCC OA version from selected project; syntax check is not possible.',
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const projPanelsPath = currentProject
+                            .getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH)
+                            .replace(/\\/g, '/');
+
+                        const normalizedForCompare = normalizedPath.replace(/\\/g, '/');
+                        if (
+                            !normalizedForCompare
+                                .toLocaleLowerCase()
+                                .startsWith(projPanelsPath.toLocaleLowerCase())
+                        ) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error:
+                                            'Selected panel is not within the current project panels directory; cannot run -syntax.',
+                                        projectPanelsPath: projPanelsPath,
+                                        filePath: normalizedPath,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const relativePanelPath = normalizedForCompare.substring(
+                            projPanelsPath.length,
+                        );
+
+                        const uiComponent = new UIComponent();
+                        uiComponent.setVersion(version);
+
+                        if (!uiComponent.exists()) {
+                            return new vscode.LanguageModelToolResult([
+                                new vscode.LanguageModelTextPart(
+                                    JSON.stringify({
+                                        error: `WinCC OA UI executable not found for version ${version}.`,
+                                    }),
+                                ),
+                            ]);
+                        }
+
+                        const timeoutMs =
+                            typeof input.timeoutMs === 'number' && input.timeoutMs > 0
+                                ? input.timeoutMs
+                                : 60000;
+
+                        const severities =
+                            Array.isArray(input.severities) && input.severities.length > 0
+                                ? input.severities
+                                : ['WARNING', 'SEVERE', 'FATAL'];
+
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            `Running WCCOAui -syntax for panel ${relativePanelPath} (version=${version})`,
+                        );
+
+                        /* from OA help:
+                          -syntax all[+][-s path][-p path]... check panels and scripts (+ adds integrity check)
+                                | scripts[+] [-s path]    ... check only scripts, optionally start with path
+                                | panels[+] [-p path]     ... check only panels, optionally start with path
+                        */
+                        const args = ['-config', currentProject.getConfigPath(), '-syntax', 'panels+', '-p', relativePanelPath, '-n', '-log', '+stderr'];
+                        const exitCode = await uiComponent.start(args, {
+                            timeout: timeoutMs,
+                            checkStdout: false,
+                        });
+
+                        const stderr = uiComponent.stdErr ?? '';
+                        const stdout = uiComponent.stdOut ?? '';
+
+                        const issueLines: { severity: string; message: string }[] = [];
+                        const upperSeverities = severities.map((s) => s.toUpperCase());
+
+                        for (const rawLine of stderr.split(/\r?\n/)) {
+                            const line = rawLine.trim();
+                            if (!line) continue;
+                            const upperLine = line.toUpperCase();
+                            const matchedSeverity = upperSeverities.find((s) =>
+                                upperLine.includes(s),
+                            );
+                            if (matchedSeverity) {
+                                issueLines.push({ severity: matchedSeverity, message: line });
+                            }
+                        }
+
+                        const ok = exitCode === 0 && issueLines.length === 0;
+
+                        const maxLogChars =
+                            typeof input.maxLogChars === 'number' && input.maxLogChars > 0
+                                ? input.maxLogChars
+                                : 8000;
+
+                        const truncate = (text: string): string => {
+                            if (text.length <= maxLogChars) {
+                                return text;
+                            }
+                            return (
+                                text.slice(0, Math.max(0, maxLogChars)) +
+                                '\n...<truncated; increase maxLogChars for more>...'
+                            );
+                        };
+
+                        const elapsedMs = Date.now() - startedAt;
+                        ExtensionOutputChannel.info(
+                            'LM Tools',
+                            `Tool finished: winccoaPanelViewer_checkPanelSyntax (ok=${ok}, issues=${issueLines.length}, exitCode=${exitCode}, ${elapsedMs}ms)`,
+                        );
+
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify(
+                                    {
+                                        ok,
+                                        exitCode,
+                                        filePath: normalizedPath,
+                                        panelRelativePath: relativePanelPath,
+                                        severities,
+                                        issueCount: issueLines.length,
+                                        issues: issueLines.slice(0, 100),
+                                        stderrSnippet: truncate(stderr),
+                                        stdoutSnippet: truncate(stdout),
+                                    },
+                                    null,
+                                    2,
+                                ),
+                            ),
+                        ]);
+                    } catch (err) {
+                        const error = err instanceof Error ? err : new Error(String(err));
+                        ExtensionOutputChannel.error(
+                            'LM Tools',
+                            'Tool failed: winccoaPanelViewer_checkPanelSyntax',
+                            error,
+                        );
+                        return new vscode.LanguageModelToolResult([
+                            new vscode.LanguageModelTextPart(
+                                JSON.stringify({ error: error.message }),
+                            ),
+                        ]);
+                    }
+                },
+            }),
+        );
+    } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        ExtensionOutputChannel.error(
+            'LM Tools',
+            'Failed to register tool winccoaPanelViewer_checkPanelSyntax',
+            error,
+        );
+    }
 }
 
 /**
