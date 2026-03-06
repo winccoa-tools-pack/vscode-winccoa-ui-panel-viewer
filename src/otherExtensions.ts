@@ -289,7 +289,7 @@ export async function waitForCoreApi(
     coreExtensionOverride?: vscode.Extension<unknown> | null,
 ): Promise<unknown> {
     const coreExtension =
-        coreExtensionOverride === null ? undefined : coreExtensionOverride ?? getCoreExtension();
+        coreExtensionOverride === null ? undefined : (coreExtensionOverride ?? getCoreExtension());
     if (!coreExtension) {
         return Promise.resolve(null);
     }
