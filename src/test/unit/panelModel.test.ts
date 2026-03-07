@@ -1,6 +1,5 @@
 import * as assert from 'assert';
-import * as path from 'path';
-import { createEmptyPanelModel, createEncryptedPanelModel, PanelModel } from '../../panelModel';
+import { createEmptyPanelModel, createEncryptedPanelModel } from '../../panelModel';
 
 suite('panelModel Unit Tests', () => {
     suite('createEmptyPanelModel', () => {
