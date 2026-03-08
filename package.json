@@ -47,6 +47,9 @@
   ],
   "main": "./dist/extension.js",
   "private": false,
+  "extensionDependencies": [
+    "RichardJanisch.winccoa-ctrllang"
+  ],
   "contributes": {
     "languageModelTools": [
       {
