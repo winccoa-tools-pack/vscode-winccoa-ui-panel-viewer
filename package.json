@@ -3,7 +3,7 @@
   "displayName": "WinCC OA UI Panel Viewer",
   "description": "Read-only viewer for WinCC OA .pnl panel files with structure tree, properties, scripts, and preview launcher.",
   "publisher": "winccoa-tools-pack",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "winccoa-tools-pack",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -61,7 +61,12 @@
           "type": "object",
           "properties": {}
         },
-        "tags": ["winccoa", "panel", "viewer", "structure"]
+        "tags": [
+          "winccoa",
+          "panel",
+          "viewer",
+          "structure"
+        ]
       },
       {
         "name": "winccoaPanelViewer_getPanelModel",
@@ -90,7 +95,14 @@
             }
           }
         },
-        "tags": ["winccoa", "panel", "viewer", "structure", "properties", "scripts"]
+        "tags": [
+          "winccoa",
+          "panel",
+          "viewer",
+          "structure",
+          "properties",
+          "scripts"
+        ]
       },
       {
         "name": "winccoaPanelViewer_openPanelInViewer",
@@ -115,9 +127,17 @@
               "description": "Optional extra command-line arguments to pass to WCCOAui."
             }
           },
-          "required": ["filePath"]
+          "required": [
+            "filePath"
+          ]
         },
-        "tags": ["winccoa", "panel", "viewer", "ui", "preview"]
+        "tags": [
+          "winccoa",
+          "panel",
+          "viewer",
+          "ui",
+          "preview"
+        ]
       },
       {
         "name": "winccoaPanelViewer_convertPnlToXml",
@@ -139,9 +159,17 @@
               "description": "Optional output directory for the XML file; defaults to the same directory as the input panel."
             }
           },
-          "required": ["filePath"]
+          "required": [
+            "filePath"
+          ]
         },
-        "tags": ["winccoa", "panel", "convert", "pnl", "xml"]
+        "tags": [
+          "winccoa",
+          "panel",
+          "convert",
+          "pnl",
+          "xml"
+        ]
       },
       {
         "name": "winccoaPanelViewer_convertXmlToPnl",
@@ -163,9 +191,17 @@
               "description": "Optional output directory for the .pnl file; defaults to the same directory as the input XML."
             }
           },
-          "required": ["filePath"]
+          "required": [
+            "filePath"
+          ]
         },
-        "tags": ["winccoa", "panel", "convert", "xml", "pnl"]
+        "tags": [
+          "winccoa",
+          "panel",
+          "convert",
+          "xml",
+          "pnl"
+        ]
       },
       {
         "name": "winccoaPanelViewer_convertDirPnlToXml",
@@ -183,9 +219,18 @@
               "description": "Absolute path to a directory containing .pnl files to convert recursively."
             }
           },
-          "required": ["dirPath"]
+          "required": [
+            "dirPath"
+          ]
         },
-        "tags": ["winccoa", "panel", "convert", "directory", "pnl", "xml"]
+        "tags": [
+          "winccoa",
+          "panel",
+          "convert",
+          "directory",
+          "pnl",
+          "xml"
+        ]
       },
       {
         "name": "winccoaPanelViewer_convertDirXmlToPnl",
@@ -203,9 +248,18 @@
               "description": "Absolute path to a directory containing .xml panel files to convert recursively."
             }
           },
-          "required": ["dirPath"]
+          "required": [
+            "dirPath"
+          ]
         },
-        "tags": ["winccoa", "panel", "convert", "directory", "xml", "pnl"]
+        "tags": [
+          "winccoa",
+          "panel",
+          "convert",
+          "directory",
+          "xml",
+          "pnl"
+        ]
       },
       {
         "name": "winccoaPanelViewer_summarizePanel",
@@ -224,7 +278,13 @@
             }
           }
         },
-        "tags": ["winccoa", "panel", "summary", "structure", "scripts"]
+        "tags": [
+          "winccoa",
+          "panel",
+          "summary",
+          "structure",
+          "scripts"
+        ]
       },
       {
         "name": "winccoaPanelViewer_checkPanelSyntax",
@@ -258,7 +318,13 @@
             }
           }
         },
-        "tags": ["winccoa", "panel", "syntax", "validation", "logs"]
+        "tags": [
+          "winccoa",
+          "panel",
+          "syntax",
+          "validation",
+          "logs"
+        ]
       }
     ],
     "commands": [
@@ -266,10 +332,10 @@
         "command": "winccoaPanelViewer.openPanel",
         "title": "WinCC OA: Open Panel in Viewer"
       },
-        {
-          "command": "winccoaPanelViewer.loadAllPanels",
-          "title": "WinCC OA: Load All Panels from Project"
-        },
+      {
+        "command": "winccoaPanelViewer.loadAllPanels",
+        "title": "WinCC OA: Load All Panels from Project"
+      },
       {
         "command": "winccoaPanelViewer.clearPanels",
         "title": "WinCC OA: Clear Panel Viewer"
@@ -427,7 +493,13 @@
       "properties": {
         "winccoaPanelViewer.logLevel": {
           "type": "string",
-          "enum": ["ERROR", "WARN", "INFO", "DEBUG", "TRACE"],
+          "enum": [
+            "ERROR",
+            "WARN",
+            "INFO",
+            "DEBUG",
+            "TRACE"
+          ],
           "default": "INFO",
           "description": "Log level for extension output."
         }
