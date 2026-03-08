@@ -2163,8 +2163,22 @@ async function showScriptCommand(script: PanelScript): Promise<void> {
     provider.setContent(uri, script.code);
 
     const doc = await vscode.workspace.openTextDocument(uri);
-    // Ensure language mode is ctl even if no CTL extension is installed.
-    await vscode.languages.setTextDocumentLanguage(doc, 'ctrl');
+    // Prefer language id from the recommended CTL extension if available.
+    try {
+        const ctlExt = vscode.extensions.getExtension('RichardJanisch.winccoa-ctrllang');
+        let langId = 'ctl';
+        if (ctlExt) {
+            type CtlPkg = { contributes?: { languages?: Array<{ id?: string }> } };
+            const pkg = ctlExt.packageJSON as unknown as CtlPkg;
+            if (pkg?.contributes?.languages?.length) {
+                const contribLang = pkg.contributes.languages[0];
+                if (contribLang?.id) langId = contribLang.id;
+            }
+        }
+        await vscode.languages.setTextDocumentLanguage(doc, langId);
+    } catch {
+        // Ignore failures - document will still be readable without highlighting.
+    }
 
     await vscode.window.showTextDocument(doc, {
         preview: true,
