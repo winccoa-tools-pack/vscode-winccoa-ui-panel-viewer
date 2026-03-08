@@ -1,9 +1,9 @@
 {
-  "name": "winccoa-hello-world",
-  "displayName": "WinCC OA — Hello World",
-  "description": "VS Code extension template for WinCC OA tools.",
+  "name": "winccoa-ui-panel-viewer",
+  "displayName": "WinCC OA UI Panel Viewer",
+  "description": "Read-only viewer for WinCC OA .pnl panel files with structure tree, properties, scripts, and preview launcher.",
   "publisher": "winccoa-tools-pack",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "author": "winccoa-tools-pack",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -32,17 +32,479 @@
     "automation"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onLanguage:xml",
+    "workspaceContains:**/*.pnl",
+    "onLanguageModelTool:winccoaPanelViewer_listLoadedPanels",
+    "onLanguageModelTool:winccoaPanelViewer_getPanelModel",
+    "onLanguageModelTool:winccoaPanelViewer_openPanelInViewer",
+    "onLanguageModelTool:winccoaPanelViewer_convertPnlToXml",
+    "onLanguageModelTool:winccoaPanelViewer_convertXmlToPnl",
+    "onLanguageModelTool:winccoaPanelViewer_convertDirPnlToXml",
+    "onLanguageModelTool:winccoaPanelViewer_convertDirXmlToPnl",
+    "onLanguageModelTool:winccoaPanelViewer_summarizePanel",
+    "onLanguageModelTool:winccoaPanelViewer_checkPanelSyntax"
   ],
   "main": "./dist/extension.js",
   "private": false,
   "contributes": {
+    "languageModelTools": [
+      {
+        "name": "winccoaPanelViewer_listLoadedPanels",
+        "toolReferenceName": "listLoadedPanels",
+        "displayName": "List Loaded Panels",
+        "modelDescription": "List WinCC OA panels currently loaded into the Panel Viewer tree.",
+        "userDescription": "List WinCC OA panels currently loaded into the Panel Viewer tree.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(files)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        },
+        "tags": [
+          "winccoa",
+          "panel",
+          "viewer",
+          "structure"
+        ]
+      },
+      {
+        "name": "winccoaPanelViewer_getPanelModel",
+        "toolReferenceName": "getPanelModel",
+        "displayName": "Get Panel Model",
+        "modelDescription": "Get the parsed structure/properties/scripts of a loaded WinCC OA panel as JSON.",
+        "userDescription": "Get the parsed structure/properties/scripts of a loaded WinCC OA panel as JSON.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(files)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Absolute file system path of the panel (.pnl) to retrieve. If omitted, uses the currently opened panel (or the only loaded panel)."
+            },
+            "includeScripts": {
+              "type": "boolean",
+              "description": "Whether to include script bodies in the response.",
+              "default": true
+            },
+            "maxScriptChars": {
+              "type": "number",
+              "description": "Maximum number of characters per script body (truncates longer scripts).",
+              "default": 8000
+            }
+          }
+        },
+        "tags": [
+          "winccoa",
+          "panel",
+          "viewer",
+          "structure",
+          "properties",
+          "scripts"
+        ]
+      },
+      {
+        "name": "winccoaPanelViewer_openPanelInViewer",
+        "toolReferenceName": "openPanelInViewer",
+        "displayName": "Open Panel in UI Viewer",
+        "modelDescription": "Open a WinCC OA panel (.pnl) or XML (.xml, converted to .pnl first) in the WinCC OA UI viewer.",
+        "userDescription": "Open a WinCC OA .pnl or .xml file in the WinCC OA UI viewer.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(play)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Absolute path to a .pnl or .xml panel file to open in the UI viewer."
+            },
+            "uiArgs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional extra command-line arguments to pass to WCCOAui."
+            }
+          },
+          "required": [
+            "filePath"
+          ]
+        },
+        "tags": [
+          "winccoa",
+          "panel",
+          "viewer",
+          "ui",
+          "preview"
+        ]
+      },
+      {
+        "name": "winccoaPanelViewer_convertPnlToXml",
+        "toolReferenceName": "convertPnlToXml",
+        "displayName": "Convert PNL to XML (File)",
+        "modelDescription": "Convert a single WinCC OA panel .pnl file to XML on disk.",
+        "userDescription": "Convert a single WinCC OA panel .pnl file to XML on disk.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(sync)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Absolute path to a .pnl file to convert to XML."
+            },
+            "outputDir": {
+              "type": "string",
+              "description": "Optional output directory for the XML file; defaults to the same directory as the input panel."
+            }
+          },
+          "required": [
+            "filePath"
+          ]
+        },
+        "tags": [
+          "winccoa",
+          "panel",
+          "convert",
+          "pnl",
+          "xml"
+        ]
+      },
+      {
+        "name": "winccoaPanelViewer_convertXmlToPnl",
+        "toolReferenceName": "convertXmlToPnl",
+        "displayName": "Convert XML to PNL (File)",
+        "modelDescription": "Convert a single WinCC OA XML panel (.xml) back to .pnl on disk.",
+        "userDescription": "Convert a single WinCC OA XML panel (.xml) back to .pnl on disk.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(sync)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Absolute path to a .xml panel file to convert back to .pnl."
+            },
+            "outputDir": {
+              "type": "string",
+              "description": "Optional output directory for the .pnl file; defaults to the same directory as the input XML."
+            }
+          },
+          "required": [
+            "filePath"
+          ]
+        },
+        "tags": [
+          "winccoa",
+          "panel",
+          "convert",
+          "xml",
+          "pnl"
+        ]
+      },
+      {
+        "name": "winccoaPanelViewer_convertDirPnlToXml",
+        "toolReferenceName": "convertDirPnlToXml",
+        "displayName": "Convert Directory PNL → XML",
+        "modelDescription": "Recursively convert all WinCC OA .pnl files in a directory tree to XML on disk.",
+        "userDescription": "Recursively convert all WinCC OA .pnl files in a directory tree to XML on disk.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(folder)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "dirPath": {
+              "type": "string",
+              "description": "Absolute path to a directory containing .pnl files to convert recursively."
+            }
+          },
+          "required": [
+            "dirPath"
+          ]
+        },
+        "tags": [
+          "winccoa",
+          "panel",
+          "convert",
+          "directory",
+          "pnl",
+          "xml"
+        ]
+      },
+      {
+        "name": "winccoaPanelViewer_convertDirXmlToPnl",
+        "toolReferenceName": "convertDirXmlToPnl",
+        "displayName": "Convert Directory XML → PNL",
+        "modelDescription": "Recursively convert all WinCC OA XML panel files (.xml) in a directory tree back to .pnl on disk.",
+        "userDescription": "Recursively convert all WinCC OA XML panel files (.xml) in a directory tree back to .pnl on disk.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(folder)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "dirPath": {
+              "type": "string",
+              "description": "Absolute path to a directory containing .xml panel files to convert recursively."
+            }
+          },
+          "required": [
+            "dirPath"
+          ]
+        },
+        "tags": [
+          "winccoa",
+          "panel",
+          "convert",
+          "directory",
+          "xml",
+          "pnl"
+        ]
+      },
+      {
+        "name": "winccoaPanelViewer_summarizePanel",
+        "toolReferenceName": "summarizePanel",
+        "displayName": "Summarize Panel",
+        "modelDescription": "Return a short natural-language style summary and basic statistics for a loaded WinCC OA panel (shapes, scripts, errors).",
+        "userDescription": "Return a short natural-language style summary and basic statistics for a loaded WinCC OA panel (shapes, scripts, errors).",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(note)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Absolute path to the panel (.pnl) to summarize. If omitted, uses the currently opened panel or the only loaded panel."
+            }
+          }
+        },
+        "tags": [
+          "winccoa",
+          "panel",
+          "summary",
+          "structure",
+          "scripts"
+        ]
+      },
+      {
+        "name": "winccoaPanelViewer_checkPanelSyntax",
+        "toolReferenceName": "checkPanelSyntax",
+        "displayName": "Check Panel Syntax (WCCOAui -syntax)",
+        "modelDescription": "Run WCCOAui with -syntax for a panel and summarize WARNING/SEVERE/FATAL messages from logs/stderr.",
+        "userDescription": "Run WCCOAui with -syntax for a panel and summarize WARNING/SEVERE/FATAL messages from logs/stderr.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(warning)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Absolute path to the panel (.pnl) to check. If omitted, uses the currently opened panel or the only loaded panel."
+            },
+            "severities": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional list of severity keywords to treat as issues (default: WARNING, SEVERE, FATAL)."
+            },
+            "timeoutMs": {
+              "type": "number",
+              "description": "Optional timeout in milliseconds for the WCCOAui -syntax process (default: 60000)."
+            },
+            "maxLogChars": {
+              "type": "number",
+              "description": "Maximum number of characters to return from stderr/stdout snippets (default: 8000)."
+            }
+          }
+        },
+        "tags": [
+          "winccoa",
+          "panel",
+          "syntax",
+          "validation",
+          "logs"
+        ]
+      }
+    ],
     "commands": [
       {
-        "command": "winccoa.helloWorld",
-        "title": "WinCC OA: Hello World"
+        "command": "winccoaPanelViewer.openPanel",
+        "title": "WinCC OA: Open Panel in Viewer"
+      },
+      {
+        "command": "winccoaPanelViewer.loadAllPanels",
+        "title": "WinCC OA: Load All Panels from Project"
+      },
+      {
+        "command": "winccoaPanelViewer.clearPanels",
+        "title": "WinCC OA: Clear Panel Viewer"
+      },
+      {
+        "command": "winccoaPanelViewer.dumpLanguageModelTools",
+        "title": "WinCC OA: Dump Language Model Tools"
+      },
+      {
+        "command": "winccoaPanelViewer.invokeListLoadedPanelsTool",
+        "title": "WinCC OA: Invoke LM Tool (List Loaded Panels)"
+      },
+      {
+        "command": "winccoaPanelViewer.invokeGetPanelModelTool",
+        "title": "WinCC OA: Invoke LM Tool (Get Panel Model)"
+      },
+      {
+        "command": "winccoaPanelViewer.pnlToXml",
+        "title": "WinCC OA: Convert PNL to XML"
+      },
+      {
+        "command": "winccoaPanelViewer.xmlToPnl",
+        "title": "WinCC OA: Convert XML to PNL"
+      },
+      {
+        "command": "winccoaPanelViewer.convertDirPnlToXml",
+        "title": "WinCC OA: Convert Directory PNL → XML"
+      },
+      {
+        "command": "winccoaPanelViewer.convertDirXmlToPnl",
+        "title": "WinCC OA: Convert Directory XML → PNL"
+      },
+      {
+        "command": "winccoaPanelViewer.previewPanel",
+        "title": "WinCC OA: Preview Panel in UI",
+        "category": "WinCC OA Panel Viewer",
+        "icon": {
+          "light": "resources/preview-light.svg",
+          "dark": "resources/preview-dark.svg"
+        }
+      },
+      {
+        "command": "winccoaPanelViewer.previewPanelWithOptions",
+        "title": "WinCC OA: Preview Panel in UI with Options",
+        "category": "WinCC OA Panel Viewer",
+        "icon": {
+          "light": "resources/preview-light.svg",
+          "dark": "resources/preview-dark.svg"
+        }
+      },
+      {
+        "command": "winccoaPanelViewer.checkPanelSyntax",
+        "title": "WinCC OA: Check Panel Syntax (WCCOAui -syntax)",
+        "category": "WinCC OA Panel Viewer"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "winccoaPanelViewer",
+          "title": "WinCC OA Panel Viewer",
+          "icon": "resources/activity-monitor-gear-overlay.svg",
+          "activeIcon": "resources/activity-monitor-gear-overlay-active.svg"
+        }
+      ]
+    },
+    "views": {
+      "winccoaPanelViewer": [
+        {
+          "id": "winccoaPanelStructure",
+          "name": "Panel Structure",
+          "icon": "resources/icon.png"
+        },
+        {
+          "id": "winccoaPanelDetails",
+          "name": "Details",
+          "type": "webview",
+          "icon": "resources/icon.png"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "winccoaPanelStructure",
+        "contents": "No panel loaded.\n[Open Panel](command:winccoaPanelViewer.openPanel)\n[Load All Panels from Project](command:winccoaPanelViewer.loadAllPanels)\nOr right-click a .pnl file in Explorer → 'WinCC OA: Open Panel'"
+      },
+      {
+        "view": "winccoaPanelDetails",
+        "contents": "Select a property or script in the tree to see details."
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "winccoaPanelViewer.openPanel",
+          "when": "resourceExtname == .pnl",
+          "group": "winccoa@1"
+        },
+        {
+          "command": "winccoaPanelViewer.pnlToXml",
+          "when": "resourceExtname == .pnl",
+          "group": "winccoa@2"
+        },
+        {
+          "command": "winccoaPanelViewer.xmlToPnl",
+          "when": "resourceExtname == .xml",
+          "group": "winccoa@2"
+        },
+        {
+          "command": "winccoaPanelViewer.convertDirPnlToXml",
+          "when": "explorerResourceIsFolder",
+          "group": "winccoa@3"
+        },
+        {
+          "command": "winccoaPanelViewer.convertDirXmlToPnl",
+          "when": "explorerResourceIsFolder",
+          "group": "winccoa@3"
+        },
+        {
+          "command": "winccoaPanelViewer.previewPanel",
+          "when": "resourceExtname == .pnl",
+          "group": "winccoa@4"
+        },
+        {
+          "command": "winccoaPanelViewer.previewPanelWithOptions",
+          "when": "resourceExtname == .pnl",
+          "group": "winccoa@4"
+        },
+        {
+          "command": "winccoaPanelViewer.checkPanelSyntax",
+          "when": "resourceExtname == .pnl",
+          "group": "winccoa@5"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "winccoaPanelViewer.previewPanel",
+          "when": "view == winccoaPanelStructure",
+          "group": "navigation"
+        },
+        {
+          "command": "winccoaPanelViewer.previewPanelWithOptions",
+          "when": "view == winccoaPanelStructure",
+          "group": "navigation"
+        },
+        {
+          "command": "winccoaPanelViewer.checkPanelSyntax",
+          "when": "view == winccoaPanelStructure",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "WinCC OA Panel Viewer",
+      "properties": {
+        "winccoaPanelViewer.logLevel": {
+          "type": "string",
+          "enum": [
+            "ERROR",
+            "WARN",
+            "INFO",
+            "DEBUG",
+            "TRACE"
+          ],
+          "default": "INFO",
+          "description": "Log level for extension output."
+        }
+      }
+    }
   },
   "extensionDependencies": [
     "RichardJanisch.winccoa-project-admin"
@@ -122,6 +584,7 @@
     "winccoaImage": "mpokornyetm/winccoa-tools-pack-npm-winccoa-core:npm-winccoa-core"
   },
   "dependencies": {
-    "@winccoa-tools-pack/npm-winccoa-core": "0.2.6"
+    "@winccoa-tools-pack/npm-winccoa-core": "0.2.6",
+    "@winccoa-tools-pack/npm-winccoa-ui-pnl-xml": "^0.1.0"
   }
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="WinCC OA Panel Viewer (active)">
+  <!-- Monitor frame (border only) in yellow for active state -->
+  <rect x="2" y="3" width="20" height="14" rx="1.5" fill="none" stroke="#FBBF24" stroke-width="1.5"/>
+  <!-- stand -->
+  <rect x="9" y="17" width="6" height="2" rx="0.5" fill="#FBBF24"/>
+  <rect x="7" y="19" width="10" height="1.5" rx="0.5" fill="#FBBF24"/>
+
+  <!-- Gear overlay (bottom-right corner of monitor) -->
+  <g transform="translate(15,10)">
+    <circle cx="4" cy="4" r="3.2" fill="#0b1220"/>
+    <circle cx="4" cy="4" r="1.4" fill="#FBBF24"/>
+    <!-- gear teeth -->
+    <rect x="3.4" y="0" width="1.2" height="1.6" rx="0.3" fill="#0b1220"/>
+    <rect x="3.4" y="6.4" width="1.2" height="1.6" rx="0.3" fill="#0b1220"/>
+    <rect x="0" y="3.4" width="1.6" height="1.2" rx="0.3" fill="#0b1220"/>
+    <rect x="6.4" y="3.4" width="1.6" height="1.2" rx="0.3" fill="#0b1220"/>
+    <rect x="0.8" y="0.8" width="1.2" height="1.2" rx="0.3" fill="#0b1220" transform="rotate(45 1.4 1.4)"/>
+    <rect x="5.8" y="5.8" width="1.2" height="1.2" rx="0.3" fill="#0b1220" transform="rotate(45 6.4 6.4)"/>
+    <rect x="5.8" y="0.8" width="1.2" height="1.2" rx="0.3" fill="#0b1220" transform="rotate(-45 6.4 1.4)"/>
+    <rect x="0.8" y="5.8" width="1.2" height="1.2" rx="0.3" fill="#0b1220" transform="rotate(-45 1.4 6.4)"/>
+  </g>
+</svg>

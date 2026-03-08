@@ -152,8 +152,8 @@ suite('Full VS Code Integration Tests with WinCC OA', () => {
             originalProject !== undefined
                 ? undefined
                 : Array.isArray(runningProjects) && runningProjects.length > 0
-                ? runningProjects[0]
-                : undefined;
+                  ? runningProjects[0]
+                  : undefined;
 
         if (targetProject === undefined && originalProject === undefined) {
             // Nothing to toggle to without depending on environment.

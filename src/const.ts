@@ -14,7 +14,7 @@
  *
  * @example 'winccoa.my-extension'
  */
-export const EXTENSION_ID = 'winccoa.yourExtensionId';
+export const EXTENSION_ID = 'winccoa-tools-pack.winccoa-ui-panel-viewer';
 
 /**
  * The human-readable display name of the extension.
@@ -24,7 +24,7 @@ export const EXTENSION_ID = 'winccoa.yourExtensionId';
  *
  * @example 'WinCC OA My Extension'
  */
-export const EXTENSION_NAME = 'WinCC OA Your Extension Name';
+export const EXTENSION_NAME = 'WinCC OA UI Panel Viewer';
 
 /**
  * The configuration section name for this extension's settings.
@@ -34,7 +34,7 @@ export const EXTENSION_NAME = 'WinCC OA Your Extension Name';
  *
  * @example 'winccoaMyExtension'
  */
-export const EXTENSION_CONFIG_SECTION = 'winccoaTemplateExtension';
+export const EXTENSION_CONFIG_SECTION = 'winccoaPanelViewer';
 
 /**
  * The extension ID of the WinCC OA Project Admin core extension.

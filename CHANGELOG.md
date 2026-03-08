@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-08
+
+### Added
+
+- update panel viewer icons and add active state SVG
+- add methods to list all loaded panel models and retrieve a specific model by path
+- Implement virtual CTL provider for read-only script documents and enhance details pane
+- Add details pane for properties and scripts in panel viewer
+- Refactor command titles for clarity and update panels directory selection logic
+- Enhance panel tree structure with directory support and improved item organization
+- Update integration section with preview launcher and change detection features
+- Implement change detection and version picker in panel viewer
+- Enhance panel preview functionality and integrate project version detection
+- Update extension identifiers and add panel conversion utilities
+
+### Fixed
+
+- remove unused path import in panelModel unit tests
+- update package-lock.json to add peer dependencies and improve integration test formatting
+- add missing endOfLine setting in Prettier configuration
+
+### Changed
+
+- icon
+- add unit tests for panelModel, panelParser, and converter
+- update README to reflect project name and improve description for the WinCC OA UI Panel Viewer
+- streamline code formatting and improve readability in commands and panel details view
+
 ## [0.1.5] - 2026-02-23
 
 ### Added
