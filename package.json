@@ -552,7 +552,7 @@
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.1",
-    "eslint": "^10.0.2",
+    "eslint": "^10.0.3",
     "glob": "^13.0.3",
     "globals": "^17.4.0",
     "markdownlint-cli": "^0.47.0",
@@ -561,7 +561,7 @@
     "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.2.0",
-    "webpack": "^5.105.3",
+    "webpack": "^5.105.4",
     "webpack-cli": "^6.0.1"
   },
   "overrides": {
