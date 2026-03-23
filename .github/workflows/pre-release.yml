@@ -65,7 +65,7 @@ jobs:
 
       - name: Generate changelog entry
         id: gen
-        uses: ./.github/actions/generate-changelog
+        uses: winccoa-tools-pack/.github/.github/actions/generate-changelog@main
 
       - name: Upsert PR comment
         uses: actions/github-script@v8
