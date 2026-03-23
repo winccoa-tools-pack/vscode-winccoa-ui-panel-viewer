@@ -3,18 +3,18 @@
   "displayName": "WinCC OA UI Panel Viewer",
   "description": "Read-only viewer for WinCC OA .pnl panel files with structure tree, properties, scripts, and preview launcher.",
   "publisher": "winccoa-tools-pack",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "winccoa-tools-pack",
   "license": "MIT",
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/winccoa-tools-pack/<your-repository>"
+    "url": "https://github.com/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer"
   },
   "bugs": {
-    "url": "https://github.com/winccoa-tools-pack/<your-repository>/issues"
+    "url": "https://github.com/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer/issues"
   },
-  "homepage": "https://github.com/winccoa-tools-pack/<your-repository>#readme",
+  "homepage": "https://github.com/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer#readme",
   "engines": {
     "vscode": "^1.109.2"
   },
@@ -507,6 +507,7 @@
     }
   },
   "extensionDependencies": [
+    "RichardJanisch.winccoa-ctrllang",
     "RichardJanisch.winccoa-project-admin"
   ],
   "scripts": {
@@ -577,7 +578,7 @@
       "minimatch": "10.2.2"
     },
     "@vscode/vsce": {
-      "minimatch": "10.2.2"
+      "minimatch": "3.1.2"
     }
   },
   "config": {
@@ -585,6 +586,7 @@
   },
   "dependencies": {
     "@winccoa-tools-pack/npm-winccoa-core": "0.2.6",
-    "@winccoa-tools-pack/npm-winccoa-ui-pnl-xml": "^0.1.0"
+    "@winccoa-tools-pack/npm-winccoa-ui-pnl-xml": "^0.1.0",
+    "@winccoa-tools-pack/npm-winccoa-syntax-check": "^0.1.0"
   }
 }

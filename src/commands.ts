@@ -23,8 +23,9 @@ import { PanelDetailsView } from './panelDetailsView';
 import { VirtualCtlProvider } from './virtualCtlProvider';
 import { UIComponent } from '@winccoa-tools-pack/npm-winccoa-core/types/components/implementations/index';
 import { getSelectedProject } from './otherExtensions';
-import { CORE_EXTENSION_ID, EXTENSION_NAME } from './const';
+import { CORE_EXTENSION_ID } from './const';
 import { ProjEnvProjectFileSysStruct } from '@winccoa-tools-pack/npm-winccoa-core';
+import { checkPanels } from '@winccoa-tools-pack/npm-winccoa-syntax-check';
 
 /** Singleton tree provider instance */
 let treeProvider: PanelTreeProvider | undefined;
@@ -287,101 +288,31 @@ async function checkPanelSyntaxCommand(uri?: vscode.Uri): Promise<void> {
 
         const relativePanelPath = normalizedForCompare.substring(projPanelsPath.length);
 
-        const uiComponent = new UIComponent();
-        uiComponent.setVersion(version);
-
-        if (!uiComponent.exists()) {
-            void vscode.window.showErrorMessage(
-                `WinCC OA UI executable not found for version ${version}.`,
-            );
-            return;
-        }
-
-        const timeoutMs = 60000;
-        const severities = ['WARNING', 'SEVERE', 'FATAL'];
-
-        ExtensionOutputChannel.info(
-            'Syntax',
-            `Running WCCOAui -syntax for panel ${relativePanelPath} (version=${version})`,
-        );
-
-        const args = [
-            '-config',
-            currentProject.getConfigPath(),
-            '-syntax',
-            'panels+',
-            '-p',
-            relativePanelPath,
-            '-n',
-            '-log',
-            '+stderr',
-        ];
-
-        const exitCode = await uiComponent.start(args, {
-            timeout: timeoutMs,
-            checkStdout: false,
+        const panelsResult = await checkPanels({
+            version,
+            configPath: currentProject.getConfigPath(),
+            panelsPath: relativePanelPath,
         });
 
-        const stderr = uiComponent.stdErr ?? '';
-        const stdout = uiComponent.stdOut ?? '';
-
-        const issueLines: { severity: string; message: string }[] = [];
-        const upperSeverities = severities.map((s) => s.toUpperCase());
-
-        for (const rawLine of stderr.split(/\r?\n/)) {
-            const line = rawLine.trim();
-            if (!line) continue;
-            const upperLine = line.toUpperCase();
-            const matchedSeverity = upperSeverities.find((s) => upperLine.includes(s));
-            if (matchedSeverity) {
-                issueLines.push({ severity: matchedSeverity, message: line });
-            }
+        const combinedOutput = `${panelsResult.stdout ?? ''}\n${panelsResult.stderr ?? ''}`.trim();
+        if (combinedOutput) {
+            ExtensionOutputChannel.info('Syntax Check', combinedOutput);
         }
 
-        const ok = exitCode === 0 && issueLines.length === 0;
-
-        if (ok) {
-            ExtensionOutputChannel.info(
-                'Syntax',
-                `Panel syntax OK for ${relativePanelPath} (no WARNING/SEVERE/FATAL). Exit code=${exitCode}.`,
-            );
-            ExtensionOutputChannel.instance.show(true);
-            void vscode.window.showInformationMessage(
-                `Panel syntax OK for ${path.basename(normalizedPath)}.`,
+        if (!panelsResult.success) {
+            void vscode.window.showErrorMessage(
+                `Syntax check failed (exit ${panelsResult.exitCode}): ${panelsResult.stderr}`,
             );
             return;
         }
 
-        ExtensionOutputChannel.warn(
-            'Syntax',
-            `Panel syntax check found ${issueLines.length} issue(s) for ${relativePanelPath}. Exit code=${exitCode}.`,
-        );
-        for (const issue of issueLines) {
-            ExtensionOutputChannel.warn('Syntax', `${issue.severity}: ${issue.message}`);
-        }
-
-        if (stderr.trim()) {
-            ExtensionOutputChannel.warn('Syntax', '--- stderr ---');
-            ExtensionOutputChannel.warn('Syntax', stderr);
-        }
-        if (stdout.trim()) {
-            ExtensionOutputChannel.info('Syntax', '--- stdout ---');
-            ExtensionOutputChannel.info('Syntax', stdout);
-        }
-
-        ExtensionOutputChannel.instance.show(true);
-        void vscode.window.showWarningMessage(
-            `Panel syntax check found ${issueLines.length} issue(s) for ${path.basename(
-                normalizedPath,
-            )}. See "${EXTENSION_NAME}" output for details.`,
-        );
+        void vscode.window.showInformationMessage('Panel syntax check passed.');
     } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        ExtensionOutputChannel.error('Syntax', 'Failed to run panel syntax check', error);
-        ExtensionOutputChannel.instance.show(true);
-        void vscode.window.showErrorMessage(
-            'Failed to run panel syntax check. See Output for details.',
-        );
+        ExtensionOutputChannel.error('Syntax Check', 'Failed to run panel syntax check', error);
+        void vscode.window.showErrorMessage('Failed to run syntax check. See Output.');
+    } finally {
+        ExtensionOutputChannel.instance?.show(true);
     }
 }
 
@@ -1589,18 +1520,58 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
                         const stderr = uiComponent.stdErr ?? '';
                         const stdout = uiComponent.stdOut ?? '';
 
-                        const issueLines: { severity: string; message: string }[] = [];
-                        const upperSeverities = severities.map((s) => s.toUpperCase());
+                        let issueLines: { severity: string; message: string }[] = [];
+                        // Try to use external syntax-check parser package if available; fallback to basic parsing
+                        try {
+                            type ParseItem = { severity?: string; message?: string };
+                            type ParseResult = ParseItem[];
+                            type CheckerModule =
+                                | ((text: string) => Promise<ParseResult>)
+                                | {
+                                      default?: (text: string) => Promise<ParseResult>;
+                                      parse?: (text: string) => Promise<ParseResult>;
+                                  };
 
-                        for (const rawLine of stderr.split(/\r?\n/)) {
-                            const line = rawLine.trim();
-                            if (!line) continue;
-                            const upperLine = line.toUpperCase();
-                            const matchedSeverity = upperSeverities.find((s) =>
-                                upperLine.includes(s),
-                            );
-                            if (matchedSeverity) {
-                                issueLines.push({ severity: matchedSeverity, message: line });
+                            const checker =
+                                (await import('@winccoa-tools-pack/npm-winccoa-syntax-check')) as unknown as CheckerModule;
+                            let parsed: ParseResult | undefined;
+                            if (typeof checker === 'function') {
+                                parsed = await (checker as (text: string) => Promise<ParseResult>)(
+                                    stderr,
+                                );
+                            } else {
+                                const moduleObj = checker as {
+                                    default?: (text: string) => Promise<ParseResult>;
+                                    parse?: (text: string) => Promise<ParseResult>;
+                                };
+                                if (typeof moduleObj.default === 'function')
+                                    parsed = await moduleObj.default(stderr);
+                                else if (typeof moduleObj.parse === 'function')
+                                    parsed = await moduleObj.parse(stderr);
+                            }
+
+                            if (Array.isArray(parsed)) {
+                                issueLines = parsed.map((p) => ({
+                                    severity: (p.severity ?? 'UNKNOWN').toString(),
+                                    message: p.message ?? String(p),
+                                }));
+                            }
+                        } catch {
+                            // ignore and fall back to simple text matching below
+                        }
+
+                        if (issueLines.length === 0) {
+                            const upperSeverities = severities.map((s) => s.toUpperCase());
+                            for (const rawLine of stderr.split(/\r?\n/)) {
+                                const line = rawLine.trim();
+                                if (!line) continue;
+                                const upperLine = line.toUpperCase();
+                                const matchedSeverity = upperSeverities.find((s) =>
+                                    upperLine.includes(s),
+                                );
+                                if (matchedSeverity) {
+                                    issueLines.push({ severity: matchedSeverity, message: line });
+                                }
                             }
                         }
 
@@ -2163,8 +2134,22 @@ async function showScriptCommand(script: PanelScript): Promise<void> {
     provider.setContent(uri, script.code);
 
     const doc = await vscode.workspace.openTextDocument(uri);
-    // Ensure language mode is ctl even if no CTL extension is installed.
-    await vscode.languages.setTextDocumentLanguage(doc, 'ctrl');
+    // Prefer language id from the recommended CTL extension if available.
+    try {
+        const ctlExt = vscode.extensions.getExtension('RichardJanisch.winccoa-ctrllang');
+        let langId = 'ctl';
+        if (ctlExt) {
+            type CtlPkg = { contributes?: { languages?: Array<{ id?: string }> } };
+            const pkg = ctlExt.packageJSON as unknown as CtlPkg;
+            if (pkg?.contributes?.languages?.length) {
+                const contribLang = pkg.contributes.languages[0];
+                if (contribLang?.id) langId = contribLang.id;
+            }
+        }
+        await vscode.languages.setTextDocumentLanguage(doc, langId);
+    } catch {
+        // Ignore failures - document will still be readable without highlighting.
+    }
 
     await vscode.window.showTextDocument(doc, {
         preview: true,
