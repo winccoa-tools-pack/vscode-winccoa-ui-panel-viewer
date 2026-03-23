@@ -9,7 +9,7 @@
 
 <!-- What is being released/fixed? Include risk/impact if hotfix. -->
 
-> Note: Git Flow and Conventional Commits are validated automatically by the **Git Flow Validation** GitHub Action.
+> Note: Git Flow and Conventional Commits are validated automatically by the CI/CD pipeline check (**Validate Git Flow + Conventional Commits**).
 
 ## 🚀 Pre-release (Alpha)
 
