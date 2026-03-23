@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - use org actions to unify workflows (#37)
+
 ## [0.2.1] - 2026-03-23
 
 ### Added
