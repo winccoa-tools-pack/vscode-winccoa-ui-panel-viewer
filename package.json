@@ -9,12 +9,12 @@
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/winccoa-tools-pack/<your-repository>"
+    "url": "https://github.com/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer"
   },
   "bugs": {
-    "url": "https://github.com/winccoa-tools-pack/<your-repository>/issues"
+    "url": "https://github.com/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer/issues"
   },
-  "homepage": "https://github.com/winccoa-tools-pack/<your-repository>#readme",
+  "homepage": "https://github.com/winccoa-tools-pack/vscode-winccoa-ui-panel-viewer#readme",
   "engines": {
     "vscode": "^1.109.2"
   },
@@ -47,9 +47,6 @@
   ],
   "main": "./dist/extension.js",
   "private": false,
-  "extensionDependencies": [
-    "RichardJanisch.winccoa-ctrllang"
-  ],
   "contributes": {
     "languageModelTools": [
       {
@@ -510,6 +507,7 @@
     }
   },
   "extensionDependencies": [
+    "RichardJanisch.winccoa-ctrllang",
     "RichardJanisch.winccoa-project-admin"
   ],
   "scripts": {
@@ -580,7 +578,7 @@
       "minimatch": "10.2.2"
     },
     "@vscode/vsce": {
-      "minimatch": "10.2.2"
+      "minimatch": "3.1.2"
     }
   },
   "config": {
@@ -588,6 +586,7 @@
   },
   "dependencies": {
     "@winccoa-tools-pack/npm-winccoa-core": "0.2.6",
-    "@winccoa-tools-pack/npm-winccoa-ui-pnl-xml": "^0.1.0"
+    "@winccoa-tools-pack/npm-winccoa-ui-pnl-xml": "^0.1.0",
+    "@winccoa-tools-pack/npm-winccoa-syntax-check": "^0.1.0"
   }
 }

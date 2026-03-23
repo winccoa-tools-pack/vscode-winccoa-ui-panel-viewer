@@ -4,7 +4,7 @@
 
 <!-- What does this PR change and why? -->
 
-> Note: Git Flow and Conventional Commits are validated automatically by the **Git Flow Validation** GitHub Action.
+> Note: Git Flow and Conventional Commits are validated automatically by the CI/CD pipeline check (**Validate Git Flow + Conventional Commits**).
 
 ## 🔗 Related Issue(s)
 
