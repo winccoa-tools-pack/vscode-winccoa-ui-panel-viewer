@@ -1,7 +1,7 @@
 # Repository settings applied via GitHub REST API by .github/workflows/apply-settings-and-rulesets.yml
 # This repo uses GitFlow: develop is default, main is stable release.
 
-description: "The template for WinCC OA VS Code extension"
+description: "Read-only viewer for WinCC OA .pnl panel files with structure tree, properties, scripts, and preview launcher."
 homepage: "https://github.com/winccoa-tools-pack"
 default_branch: "develop"
 
@@ -26,6 +26,10 @@ topics:
   - industrial-automation
   - Siemens
   - ETM
+  - winccoa-ui
+  - winccoa-panel-viewer
+  - winccoa-panel-linter
+  - winccoa-panel-inspector
 
 security:
   enable_vulnerability_alerts: true
