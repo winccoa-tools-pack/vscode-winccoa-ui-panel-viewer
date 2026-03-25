@@ -3,7 +3,7 @@
   "displayName": "WinCC OA UI Panel Viewer",
   "description": "Read-only viewer for WinCC OA .pnl panel files with structure tree, properties, scripts, and preview launcher.",
   "publisher": "winccoa-tools-pack",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "author": "winccoa-tools-pack",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -502,6 +502,11 @@
           ],
           "default": "INFO",
           "description": "Log level for extension output."
+        },
+        "winccoaPanelViewer.showPerformanceHint": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a one-time performance hint that the XML-based workflow is typically faster."
         }
       }
     }

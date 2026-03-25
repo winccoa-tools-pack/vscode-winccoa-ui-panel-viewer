@@ -44,6 +44,7 @@ import { ExtensionOutputChannel } from './extensionOutput';
 import { EXTENSION_CONFIG_SECTION, EXTENSION_ID, EXTENSION_NAME } from './const';
 import { setupCoreExtensionIntegration, cleanupCoreExtensionIntegration } from './otherExtensions';
 import { registerCommands } from './commands';
+import { getPerformanceHintConfiguration, showPerformanceHintOnce } from './performanceHint';
 
 /**
  * Interface representing a WinCC OA project.
@@ -79,6 +80,13 @@ export async function activate(context: vscode.ExtensionContext) {
     ExtensionOutputChannel.info('Extension', `${EXTENSION_NAME} (${EXTENSION_ID}) activated`);
     ExtensionOutputChannel.info('Extension', `Extension Path: ${context.extensionPath}`);
     ExtensionOutputChannel.debug('Extension', `VS Code Version: ${vscode.version}`);
+
+    // One-time performance hint (issue #20)
+    await showPerformanceHintOnce({
+        configuration: getPerformanceHintConfiguration(vscode.workspace),
+        globalState: context.globalState,
+        showInformationMessage: vscode.window.showInformationMessage,
+    });
 
     // Setup Core extension integration if in automatic mode
     await setupCoreExtensionIntegration(context);
