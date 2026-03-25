@@ -502,6 +502,11 @@
           ],
           "default": "INFO",
           "description": "Log level for extension output."
+        },
+        "winccoaPanelViewer.showPerformanceHint": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a one-time performance hint that the XML-based workflow is typically faster."
         }
       }
     }
