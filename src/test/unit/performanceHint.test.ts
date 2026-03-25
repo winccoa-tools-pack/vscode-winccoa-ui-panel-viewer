@@ -43,10 +43,7 @@ suite('performanceHint Unit Tests', () => {
         assert.strictEqual(didShow, true);
         assert.strictEqual(messages.length, 1);
         assert.ok(messages[0].includes('XML'));
-        assert.strictEqual(
-            globalState.get<boolean>('performanceHintShown', false),
-            true,
-        );
+        assert.strictEqual(globalState.get<boolean>('performanceHintShown', false), true);
 
         const didShowAgain = await showPerformanceHintOnce({
             configuration,
@@ -83,10 +80,7 @@ suite('performanceHint Unit Tests', () => {
 
         assert.strictEqual(didShow, false);
         assert.strictEqual(called, false);
-        assert.strictEqual(
-            globalState.get<boolean>('performanceHintShown', false),
-            false,
-        );
+        assert.strictEqual(globalState.get<boolean>('performanceHintShown', false), false);
     });
 
     test('does not show hint when already shown', async () => {
