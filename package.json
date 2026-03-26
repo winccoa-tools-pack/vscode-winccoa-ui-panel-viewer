@@ -3,7 +3,7 @@
   "displayName": "WinCC OA UI Panel Viewer",
   "description": "Read-only viewer for WinCC OA .pnl panel files with structure tree, properties, scripts, and preview launcher.",
   "publisher": "winccoa-tools-pack",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "author": "winccoa-tools-pack",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -35,6 +35,8 @@
     "onStartupFinished",
     "onLanguage:xml",
     "workspaceContains:**/*.pnl",
+    "workspaceContains:**/panels/*.xml",
+    "workspaceContains:**/panels/**/*.xml",
     "onLanguageModelTool:winccoaPanelViewer_listLoadedPanels",
     "onLanguageModelTool:winccoaPanelViewer_getPanelModel",
     "onLanguageModelTool:winccoaPanelViewer_openPanelInViewer",
@@ -81,7 +83,7 @@
           "properties": {
             "filePath": {
               "type": "string",
-              "description": "Absolute file system path of the panel (.pnl) to retrieve. If omitted, uses the currently opened panel (or the only loaded panel)."
+              "description": "Absolute file system path of the panel (.pnl or .xml) to retrieve. If omitted, uses the currently opened panel (or the only loaded panel)."
             },
             "includeScripts": {
               "type": "boolean",
@@ -431,7 +433,7 @@
       "explorer/context": [
         {
           "command": "winccoaPanelViewer.openPanel",
-          "when": "resourceExtname == .pnl",
+          "when": "resourceExtname == .pnl || resourceExtname == .xml",
           "group": "winccoa@1"
         },
         {
@@ -456,17 +458,17 @@
         },
         {
           "command": "winccoaPanelViewer.previewPanel",
-          "when": "resourceExtname == .pnl",
+          "when": "resourceExtname == .pnl || resourceExtname == .xml",
           "group": "winccoa@4"
         },
         {
           "command": "winccoaPanelViewer.previewPanelWithOptions",
-          "when": "resourceExtname == .pnl",
+          "when": "resourceExtname == .pnl || resourceExtname == .xml",
           "group": "winccoa@4"
         },
         {
           "command": "winccoaPanelViewer.checkPanelSyntax",
-          "when": "resourceExtname == .pnl",
+          "when": "resourceExtname == .pnl || resourceExtname == .xml",
           "group": "winccoa@5"
         }
       ],

@@ -14,17 +14,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { pnlToXml, xmlToPnl } from '@winccoa-tools-pack/npm-winccoa-ui-pnl-xml';
 import { ExtensionOutputChannel } from './extensionOutput';
-import { getSelectedProject } from './otherExtensions';
-
-// TODO: Get config path from winccoa-project-admin extension when available
-// Hardcoded for playground/testing
-const TEMP_CONFIG_PATH =
-    'C:\\ws\\ETM\\WinCCOA\\support\\3.20\\Test\\CtrlTF\\WinCC_OA_Test\\Projects\\TfCustomized\\config\\config';
-
-// TODO: Get panels directory from winccoa-project-admin extension when available
-// Hardcoded for playground/testing - panel paths must be relative to this directory
-const TEMP_PANELS_DIR =
-    'C:\\ws\\ETM\\WinCCOA\\support\\3.20\\Test\\CtrlTF\\WinCC_OA_Test\\Projects\\TfCustomized\\panels';
+import { getWinccoaProject } from './utils';
+import { ProjEnvProjectFileSysStruct } from '@winccoa-tools-pack/npm-winccoa-core';
 
 /** Result of a conversion operation */
 export interface ConversionResult {
@@ -50,26 +41,6 @@ export async function isEncryptedPanel(filePath: string): Promise<boolean> {
 }
 
 /**
- * Gets the WinCC OA version to use for conversion.
- * TODO: Integrate with RichardJanisch.winccoa-project-admin extension to pick version dynamically
- */
-function getWinccoaVersion(): string | undefined {
-    const currentProject = getSelectedProject();
-
-    if (!currentProject) {
-        return undefined;
-    }
-
-    if (!currentProject.getVersion()) {
-        vscode.window.showWarningMessage(
-            `Unable to determine WinCC OA version from the selected project ${currentProject.getId()}.`,
-        );
-    }
-
-    return currentProject.getVersion();
-}
-
-/**
  * Converts a .pnl file to .xml for viewing.
  *
  * Note: The WCCOAui tool converts in-place. For viewer mode, we copy to a temp
@@ -87,20 +58,26 @@ export async function convertPnlToXml(
         return { success: false, error: 'Encrypted panel; content not viewable.' };
     }
 
-    const version = getWinccoaVersion();
-    if (!version) {
+    const oaProj = await getWinccoaProject(pnlPath);
+
+    if (!oaProj) {
         return {
             success: false,
-            error: 'No WinCC OA project selected; cannot determine WinCC OA version for conversion.',
+            error: 'No WinCC OA project selected; cannot determine WinCC OA project for conversion.',
         };
     }
+
+    const version = oaProj.getVersion();
 
     const baseName = path.basename(pnlPath);
 
     // WCCOAui requires panel paths relative to project panels directory
     // Create a temp subfolder inside panels dir, copy file there, convert
     const tempSubDir = `_temp_convert_${Date.now()}`;
-    const tempPanelsPath = path.join(TEMP_PANELS_DIR, tempSubDir);
+    const tempPanelsPath = path.join(
+        oaProj.getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH),
+        tempSubDir,
+    );
 
     // Ensure temp directory exists
     await fs.promises.mkdir(tempPanelsPath, { recursive: true });
@@ -119,9 +96,9 @@ export async function convertPnlToXml(
         );
 
         const result = await pnlToXml({
-            version,
+            version: version || 'unknown',
             inputPath: relativePath,
-            configPath: TEMP_CONFIG_PATH, // TODO: Get from winccoa-project-admin
+            configPath: oaProj.getConfigPath() || '',
             overwrite: true,
         });
 
@@ -178,11 +155,12 @@ export async function convertXmlToPnl(
     xmlPath: string,
     outputDir?: string,
 ): Promise<ConversionResult> {
-    const version = getWinccoaVersion();
-    if (!version) {
+    const oaProj = await getWinccoaProject(xmlPath);
+
+    if (!oaProj) {
         return {
             success: false,
-            error: 'No WinCC OA project selected; cannot determine WinCC OA version for conversion.',
+            error: 'No WinCC OA project selected; cannot determine WinCC OA project for conversion.',
         };
     }
 
@@ -191,7 +169,10 @@ export async function convertXmlToPnl(
     // WCCOAui requires panel paths relative to project panels directory
     // Create a temp subfolder inside panels dir, copy file there, convert
     const tempSubDir = `_temp_convert_${Date.now()}`;
-    const tempPanelsPath = path.join(TEMP_PANELS_DIR, tempSubDir);
+    const tempPanelsPath = path.join(
+        oaProj.getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH),
+        tempSubDir,
+    );
 
     // Ensure temp directory exists
     await fs.promises.mkdir(tempPanelsPath, { recursive: true });
@@ -206,13 +187,13 @@ export async function convertXmlToPnl(
     try {
         ExtensionOutputChannel.debug(
             'Converter',
-            `Converting XML to PNL: ${relativePath} (version: ${version})`,
+            `Converting XML to PNL: ${relativePath} (version: ${oaProj.getVersion()})`,
         );
 
         const result = await xmlToPnl({
-            version,
+            version: oaProj.getVersion() || 'unknown',
             inputPath: relativePath,
-            configPath: TEMP_CONFIG_PATH, // TODO: Get from winccoa-project-admin
+            configPath: oaProj.getConfigPath() || '',
             overwrite: true,
         });
 

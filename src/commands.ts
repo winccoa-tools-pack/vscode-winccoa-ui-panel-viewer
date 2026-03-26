@@ -26,6 +26,7 @@ import { getSelectedProject } from './otherExtensions';
 import { CORE_EXTENSION_ID } from './const';
 import { ProjEnvProjectFileSysStruct } from '@winccoa-tools-pack/npm-winccoa-core';
 import { checkPanels } from '@winccoa-tools-pack/npm-winccoa-syntax-check';
+import { getWinccoaProject } from './utils';
 
 /** Singleton tree provider instance */
 let treeProvider: PanelTreeProvider | undefined;
@@ -245,7 +246,7 @@ async function checkPanelSyntaxCommand(uri?: vscode.Uri): Promise<void> {
                 canSelectFiles: true,
                 canSelectFolders: false,
                 canSelectMany: false,
-                filters: { 'WinCC OA Panels': ['pnl'] },
+                filters: { 'WinCC OA Panels': ['pnl', 'xml'] },
                 title: 'Select Panel File to Check Syntax',
             });
             if (!picked || picked.length === 0) {
@@ -256,11 +257,8 @@ async function checkPanelSyntaxCommand(uri?: vscode.Uri): Promise<void> {
 
         const normalizedPath = filePath.replace(/\\/g, path.sep);
 
-        const currentProject = getSelectedProject();
+        const currentProject = await getWinccoaProject(normalizedPath);
         if (!currentProject) {
-            void vscode.window.showErrorMessage(
-                'No WinCC OA project selected. Select a project in WinCC OA Project Admin first.',
-            );
             return;
         }
 
@@ -1421,7 +1419,7 @@ function registerLanguageModelTools(context: vscode.ExtensionContext): void {
 
                         const normalizedPath = filePath.replace(/\\/g, path.sep);
 
-                        const currentProject = getSelectedProject();
+                        const currentProject = await getWinccoaProject(normalizedPath);
                         if (!currentProject) {
                             return new vscode.LanguageModelToolResult([
                                 new vscode.LanguageModelTextPart(
@@ -1657,7 +1655,7 @@ async function openPanelCommand(uri?: vscode.Uri): Promise<void> {
             canSelectFiles: true,
             canSelectFolders: false,
             canSelectMany: false,
-            filters: { 'WinCC OA Panels': ['pnl'] },
+            filters: { 'WinCC OA Panels': ['pnl', 'xml'] },
             title: 'Select Panel File',
         });
         if (!uris || uris.length === 0) return;
@@ -2036,7 +2034,7 @@ async function _previewPanel(uri?: vscode.Uri, extraUiViewerOptions?: string[]):
         return;
     }
 
-    const currentProject = getSelectedProject();
+    const currentProject = await getWinccoaProject(filePath);
 
     if (!currentProject) {
         return;
