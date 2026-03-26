@@ -15,8 +15,11 @@ import * as os from 'os';
 import { pnlToXml, xmlToPnl } from '@winccoa-tools-pack/npm-winccoa-ui-pnl-xml';
 import { ExtensionOutputChannel } from './extensionOutput';
 import { getSelectedProject } from './otherExtensions';
-import { ProjEnvProject, ProjEnvProjectFileSysStruct, getProjectByProjectPath } from '@winccoa-tools-pack/npm-winccoa-core';
-
+import {
+    ProjEnvProject,
+    ProjEnvProjectFileSysStruct,
+    getProjectByProjectPath,
+} from '@winccoa-tools-pack/npm-winccoa-core';
 
 /** Result of a conversion operation */
 export interface ConversionResult {
@@ -41,9 +44,7 @@ export async function isEncryptedPanel(filePath: string): Promise<boolean> {
     }
 }
 
-
-async function getWinccoaProject(oaPanelPath : string): Promise<ProjEnvProject | undefined> {
-
+async function getWinccoaProject(oaPanelPath: string): Promise<ProjEnvProject | undefined> {
     let currentProject: ProjEnvProject | undefined = await getProjectByProjectPath(oaPanelPath);
 
     if (currentProject) {
@@ -51,7 +52,6 @@ async function getWinccoaProject(oaPanelPath : string): Promise<ProjEnvProject |
     }
 
     currentProject = (await getSelectedProject()) ?? undefined;
-
 
     if (!currentProject) {
         vscode.window.showWarningMessage(
@@ -111,7 +111,10 @@ export async function convertPnlToXml(
     // WCCOAui requires panel paths relative to project panels directory
     // Create a temp subfolder inside panels dir, copy file there, convert
     const tempSubDir = `_temp_convert_${Date.now()}`;
-    const tempPanelsPath = path.join(oaProj.getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH), tempSubDir);
+    const tempPanelsPath = path.join(
+        oaProj.getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH),
+        tempSubDir,
+    );
 
     // Ensure temp directory exists
     await fs.promises.mkdir(tempPanelsPath, { recursive: true });
@@ -203,7 +206,10 @@ export async function convertXmlToPnl(
     // WCCOAui requires panel paths relative to project panels directory
     // Create a temp subfolder inside panels dir, copy file there, convert
     const tempSubDir = `_temp_convert_${Date.now()}`;
-    const tempPanelsPath = path.join(oaProj.getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH), tempSubDir);
+    const tempPanelsPath = path.join(
+        oaProj.getDir(ProjEnvProjectFileSysStruct.PANELS_REL_PATH),
+        tempSubDir,
+    );
 
     // Ensure temp directory exists
     await fs.promises.mkdir(tempPanelsPath, { recursive: true });
