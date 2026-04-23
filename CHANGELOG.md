@@ -94,9 +94,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - upmerge main to develop (#51)
 - Upmerge (#49)
 - corrected
-- reeomove broken files
+- remove broken files
 - load test
-- no promt
+- no prompt
 - format
 - remove unused imports and variables in example unit test
 - fix example tests
