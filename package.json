@@ -561,7 +561,7 @@
     "glob": "^13.0.3",
     "globals": "^17.4.0",
     "markdownlint-cli": "^0.48.0",
-    "mocha": "^11.7.5",
+    "mocha": "^11.7.6",
     "prettier": "^3.8.1",
     "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
