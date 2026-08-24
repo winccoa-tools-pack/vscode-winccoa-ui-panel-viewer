@@ -560,7 +560,7 @@
     "eslint": "^10.1.0",
     "glob": "^13.0.3",
     "globals": "^17.4.0",
-    "markdownlint-cli": "^0.49.0",
+    "markdownlint-cli": "^0.49.1",
     "mocha": "^11.7.5",
     "prettier": "^3.8.1",
     "ts-loader": "^9.5.4",
