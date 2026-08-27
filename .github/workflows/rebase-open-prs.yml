@@ -11,7 +11,7 @@ permissions:
 
   # allow commenting on PRs and updating workflow files when needed
   issues: write
-  workflows: write
+  
 
 jobs:
   rebase-prs:
