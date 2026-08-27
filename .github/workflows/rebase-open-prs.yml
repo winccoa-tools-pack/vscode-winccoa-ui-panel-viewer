@@ -45,7 +45,7 @@ jobs:
               echo "⚠️ Failed to update #$pr"
               if echo "$author" | grep -qi "dependabot"; then
                 echo "Posting @dependabot recreate on #$pr"
-                gh pr comment "$pr" --repo "$GH_REPO" --body "@dependabot recreate" || echo "Failed to comment on #$pr"
+                GH_TOKEN="${{ secrets.DEPENDABOT_COMMAND_TOKEN }}" gh pr comment "$pr" --repo "$GH_REPO" --body "@dependabot recreate" || echo "Failed to comment on #$pr"
               else
                 echo "Posting maintainer notice on #$pr"
                 gh pr comment "$pr" --repo "$GH_REPO" --body "Automatic rebase failed for this PR — please rebase or resolve conflicts." || echo "Failed to comment on #$pr"
