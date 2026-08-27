@@ -43,7 +43,7 @@ jobs:
               echo "✓ PR branch updated for #$pr"
             else
               echo "⚠️ Failed to update #$pr"
-              if [ "$author" = "dependabot[bot]" ]; then
+              if echo "$author" | grep -qi "dependabot"; then
                 echo "Posting @dependabot recreate on #$pr"
                 gh pr comment "$pr" --repo "$GH_REPO" --body "@dependabot recreate" || echo "Failed to comment on #$pr"
               else
