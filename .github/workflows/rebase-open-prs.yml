@@ -14,34 +14,29 @@ jobs:
     runs-on: ubuntu-latest
     needs: rebase-prs
     if: always()
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Debug header
         run: |
           echo "Debugging rebase-open-prs action"
           echo "Repository: $GH_REPO"
-        env:
-          GH_REPO: ${{ github.repository }}
 
       - name: Check GH CLI and auth
         run: |
           gh --version || true
           gh auth status || true
-        env:
-          GH_TOKEN: ${{ github.token }}
 
       - name: List open PRs against develop
         run: |
           echo "Open PRs:"
-          gh pr list --state open --base develop --json number,author,isDraft,title,headRefName,baseRefName --jq '.[] | "#\(.number) by \(.author.login) base:\(.baseRefName) head:\(.headRefName) draft:\(.isDraft) - \(.title)"' || true
-        env:
-          GH_TOKEN: ${{ github.token }}
+          gh pr list --repo "$GH_REPO" --state open --base develop --json number,author,isDraft,title,headRefName,baseRefName --jq '.[] | "#\(.number) by \(.author.login) base:\(.baseRefName) head:\(.headRefName) draft:\(.isDraft) - \(.title)"' || true
 
       - name: Attempt updating branches (dry-run style)
         run: |
           echo "Attempting to update branch for up to 5 open PRs (non-dependabot)"
-          gh pr list --state open --base develop --json number,author --jq '.[] | select(.author.login != "dependabot[bot]") | .number' | head -n 5 | while read pr; do
+          gh pr list --repo "$GH_REPO" --state open --base develop --json number,author --jq '.[] | select(.author.login != "dependabot[bot]") | .number' | head -n 5 | while read pr; do
             echo "-> Updating branch for PR #$pr"
-            gh pr update-branch --rebase "$pr" && echo "Updated #$pr" || echo "Failed to update #$pr"
+            gh pr update-branch --repo "$GH_REPO" --rebase "$pr" && echo "Updated #$pr" || echo "Failed to update #$pr"
           done
-        env:
-          GH_TOKEN: ${{ github.token }}
