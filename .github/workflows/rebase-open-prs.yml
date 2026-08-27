@@ -5,6 +5,10 @@ on:
     branches:
       - develop
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   rebase-prs:
     uses: mPokornyETM/rebase-open-prs-action/.github/workflows/rebase-open-prs.yml@v1
