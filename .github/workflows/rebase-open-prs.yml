@@ -9,4 +9,4 @@ jobs:
   rebase-prs:
     uses: mPokornyETM/rebase-open-prs-action/.github/workflows/rebase-open-prs.yml@v1
     secrets:
-      GH_TOKEN: ${{ github.token }}
+      GH_PAT: ${{ github.token }}
