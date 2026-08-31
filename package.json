@@ -595,7 +595,7 @@
     "winccoaImage": "mpokornyetm/winccoa-tools-pack-npm-winccoa-core:npm-winccoa-core"
   },
   "dependencies": {
-    "@winccoa-tools-pack/npm-winccoa-core": "0.2.6",
+    "@winccoa-tools-pack/npm-winccoa-core": "2.0.8",
     "@winccoa-tools-pack/npm-winccoa-ui-pnl-xml": "^0.1.0",
     "@winccoa-tools-pack/npm-winccoa-syntax-check": "^0.1.0"
   }
